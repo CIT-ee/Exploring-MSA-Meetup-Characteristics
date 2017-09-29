@@ -1,1 +1,10 @@
+# ignore environment and configuration 
+# related files/folders
+config
 .env
+
+# ignore raw data related files/folders
+/data/
+
+# ignore swap files
+*.swp
