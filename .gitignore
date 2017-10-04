@@ -4,7 +4,8 @@ config
 .env
 
 # ignore raw data related files/folders
-/data/
+# /data/
 
-# ignore swap files
+# ignore swap files and compiled python files
 *.swp
+*.pyc
