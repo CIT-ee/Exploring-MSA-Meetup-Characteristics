@@ -1,5 +1,5 @@
 from __future__ import print_function
-import sys, os, json, pandas as pd, geocoder, pdb,  requests.packages.urllib3 as urllib3
+import sys, os, json, pandas as pd, geocoder, pdb, requests.packages.urllib3 as urllib3
 
 sys.path.insert(0, os.environ['PROJECT_PATH']) 
 urllib3.disable_warnings(urllib3.exceptions.SNIMissingWarning)
@@ -12,7 +12,7 @@ from src.data.helper_utils.meetup_scraper import fetch_events, filter_events
 
 
 meetup_api_urls = {
-        'events_url': 'https://api.meetup.com/find/events?photo-host=public&sig_id=236706760&radius=smart&lon={lng}&lat={lat}&sig=073c382d765e9deee91240dcf21576438d764088'
+    'events_url': 'https://api.meetup.com/find/events?photo-host=public&sig_id=236706760&radius=smart&lon={lng}&lat={lat}&sig=073c382d765e9deee91240dcf21576438d764088'
 }
 
 def build_msa_coords_df(path_to_file):
