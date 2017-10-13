@@ -61,8 +61,26 @@ def build_msa_coords_df(path_to_file):
     msa_coords_df.to_csv(path_to['msa_coords'], index=False, encoding='latin1')
 
 def build_meetup_locations_df(path_to_src, path_to_dest, prop_dict, save_freq=None, use_checkpoint=False):
-
-    #TODO: test and document
+    '''Build a dataframe consisting of Meetup locations in US cities.
+    
+    Since, we are using querying the api using freeform text, the signed url
+    changes for each request and thus cannot be used for our purposes with ease.
+    Additionally, since we are using city names for the freeform text in the
+    query, non-US Meetup cities with the same name are returned. For now, they
+    are filtered out. Finally, even after using request throttling to stay within
+    the API's request rate limits, the server disconnects without warning. To
+    overcome that, checkpointing is employed.
+    
+    Keyword arguments:
+    path_to_src -- path to csv file with city names (default: None)
+    path_to_dest -- path to csv file to be created as a result of this method
+    prop_dict -- a dictionaries of properties that are to form the dataframe
+                column names and used to filter the api request (default: {})
+    save_freq -- interval (in terms of cities explored) after which to 
+                checkpoint (default: None)
+    use_checkpoint -- flag indicating whether to resume from a previous
+                    checkpoint or not (default: False)
+    '''
     cities_df = pd.read_csv(path_to_src, encoding='latin1')
     locations_endpoint, counter, start_idx = meetup_endpoint_for['locations'], 0, 0
     
@@ -73,6 +91,7 @@ def build_meetup_locations_df(path_to_src, path_to_dest, prop_dict, save_freq=No
     else:
         meetup_locations_df = pd.DataFrame(columns=prop_dict.keys())
 
+    #  start iterating over dataframe from last stopping point
     for index, row in islice(cities_df.iterrows(), start_idx, None):
         city_name = row['NAME']
         field_names = "%2C".join(list(prop_dict.values()))
@@ -82,19 +101,25 @@ def build_meetup_locations_df(path_to_src, path_to_dest, prop_dict, save_freq=No
 
         except UnicodeEncodeError:
             pass
-            #  pdb.set_trace()
 
+        #  make the request to the api endpoint
         locations = fetch_paginated_data(locations_url, None) 
         
+        #  add locations only if response returned any for that city
         if len(locations) > 0:
+
             for location in locations:
+
+                #  skip locations if not in USA
                 if location['localized_country_name'] != 'USA':
                     continue
+
                 meetup_locations_df.loc[counter] = [ value for _, value in list(location.items()) ]
                 counter += 1
 
             print('Fetched locations for {} meetup cities'.format(index), end='\r',)
 
+        #  checkpoint at regular intervals if interval is specified
         if save_freq is not None and ( index % save_freq ) == ( save_freq - 1 ):
             print('\nMaking checkpoint: Found {num_loc} in {num_cities}\n'.format(num_loc=counter, num_cities=index))
             chkpnt_path = path_to['meetup_locations_chkpnt'].format(num_loc=counter, num_cities=index)
