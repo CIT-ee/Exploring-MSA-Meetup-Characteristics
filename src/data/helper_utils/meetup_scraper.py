@@ -67,10 +67,10 @@ def fetch_paginated_data(url, data):
     #  continue hitting endpoint only if something is 
     #  returned in response payload
     if payload is not None:
-        data = data + payload if len(payload) > 0 else data
+        data = data + payload 
 
         #  parse the next url from the Link attribute in response headers
-        if 'Link' in  res_headers: 
+        if len(payload) and 'Link' in  res_headers: 
             next_url = res_headers['Link'].split('<')[1].split('>')[0]
             data = fetch_paginated_data(next_url, data)
     else:
