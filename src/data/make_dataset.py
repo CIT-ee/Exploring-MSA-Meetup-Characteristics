@@ -15,7 +15,9 @@ from src.data.helper_utils.meetup_scraper import fetch_paginated_data, filter_ev
 
 
 meetup_endpoint_for = {
-    'events': 'https://api.meetup.com/find/events?photo-host=public&sig_id=236706760&radius=smart&lon={lng}&lat={lat}&sig=073c382d765e9deee91240dcf21576438d764088',
+    'events': {
+        'topics': 'https://api.meetup.com/find/events?&sign=true&photo-host=public&lon={lon}&fields={optional_fields}&lat={lat}&only={fields}&key={api_key}'
+    },
     'locations': 'https://api.meetup.com/find/locations?&sign=true&photo-host=public&query={text}&only={fields}&key={api_key}'
 }
 
@@ -74,7 +76,7 @@ def build_meetup_locations_df(path_to_src, path_to_dest, prop_dict, save_freq=No
     Keyword arguments:
     path_to_src -- path to csv file with city names (default: None)
     path_to_dest -- path to csv file to be created as a result of this method
-    prop_dict -- a dictionaries of properties that are to form the dataframe
+    prop_dict -- a dictionary of properties that are to form the dataframe
                 column names and used to filter the api request (default: {})
     save_freq -- interval (in terms of cities explored) after which to 
                 checkpoint (default: None)
@@ -86,8 +88,8 @@ def build_meetup_locations_df(path_to_src, path_to_dest, prop_dict, save_freq=No
     
     #  load target dataframe from a checkpoint if specified
     if use_checkpoint:
-        start_idx, counter, chkpnt_fname = get_chkpnt(path_to['raw']['chkpnts']['locations'])
-        meetup_locations_df = pd.read_csv(chkpnt_fname, encoding='latin1')
+        start_idx, counter, chkpnt_path = get_chkpnt(path_to['raw']['chkpnts']['locations'])
+        meetup_locations_df = pd.read_csv(chkpnt_path, encoding='latin1')
     else:
         meetup_locations_df = pd.DataFrame(columns=prop_dict.keys())
 
@@ -125,63 +127,109 @@ def build_meetup_locations_df(path_to_src, path_to_dest, prop_dict, save_freq=No
             chkpnt_path = path_to['meetup_locations_chkpnt'].format(num_loc=counter, num_cities=index)
             meetup_locations_df.to_csv(chkpnt_path, index=False, encoding='latin1')
 
-
     print('\nBuilding Meetup locations dataframe complete! Dumping event data to {}\n'.format(path_to_dest))
-    meetup_locations_df.to_csv(path_to['meetup_locations'], index=False, encoding='latin1')
+    meetup_locations_df.to_csv(path_to['meetup_locations'], inzodex=False, encoding='latin1')
 
-def build_meetups_msa_mapping(path_to_src, path_to_dest):
-    '''Build a mapping between MSA and the events happening in it.
+def build_meetup_events_data(path_to_src, path_to_dest, query_type, fields, subfields, save_freq=None, use_checkpoint=False):
+    '''Build a mapping between meetup locations and the events happening in it.
+
+    Even after using request throttling to stay within the API's request rate 
+    limits, the server disconnects without warning. To overcome that, 
+    checkpointing is employed.
     
     Keyword arguments:
     path_to_src -- path to csv file with MSA name and coordinates (default None)
     path_to_dest -- path to json file with the mapping between MSA and events (default None)
+    query_type -- type of data to query from the endpoint
+    fields -- fields to filter the request with (default: None)
+    subfields -- subfields to filter the requests with (default: None)
+    save_freq -- interval (in terms of cities explored) after which to 
+                checkpoint (default: None)
+    use_checkpoint -- flag indicating whether to resume from a previous
     '''
-    msa_coords_df = pd.read_csv(path_to_src, encoding='latin1')
-    msa_meetup_dict, events_endpoint = {}, meetup_endpoint_for[events]
+    meetup_locations_df = pd.read_csv(path_to_src, encoding='latin1')
+    valid_meetup_locations_df = meetup_locations_df[meetup_locations_df['Is_Incorporated']]
+    events_endpoint, counter, start_idx = meetup_endpoint_for['events'][query_type], 0, 0
 
-    for index, row in msa_coords_df.iterrows():
+    #  load target data store from a checkpoint if specified
+    if use_checkpoint:
+        start_idx, counter, chkpnt_path = get_chkpnt(path_to['raw']['chkpnts']['locations'])
+        with open(chkpnt_path, 'r') as f:
+            meetup_events_data = json.load(f)
+    else:
+        meetup_events_data = []
 
-        #  pull the MSA name and coordinates, query for events around those 
-        #  coordinates, and store interesting properties from the response, mapped
-        #  the MSA in question
-        msa_name, msa_lat, msa_lng = row['Name'], row['Latitude'], row['Longitude']
-        events_url = events_endpoint.format(lat=msa_lat, lng=msa_lng)
-        events = fetch_paginated_data(events_url, None)
-        filtered_events = filter_events(events, ['name', 'group'])
-        msa_meetup_dict[msa_name] = filtered_events
-        print('Fetched events for {} MSAs'.format(index), end='\r',)
+    print('\nBuilding meetup location - meetup event bridge. Please wait..')
+    #  start iterating over dataframe from last stopping point
+    for index, row in islice(valid_meetup_locations_df.iterrows(), start_idx, None):
+
+        #  pull the meetup location coordinates, query for events around those 
+        #  coordinates, and store interesting properties from the response
+        loc_lat, loc_lng = row['Latitude'], row['Longitude']
+        field_names, subfield_name = ",".join(fields), ",".join(subfields)
+        events_url = events_endpoint.format(lat=loc_lat, lon=loc_lng, \
+                        fields=field_names, optional_fields=subfield_name, \
+                        api_key=os.environ['API_KEY'])
+        events_data = fetch_paginated_data(events_url, None)
+        counter += len(events_data)
+        meetup_events_data.append(events_data)
+
+        #  checkpoint at regular intervals if interval is specified
+        if save_freq is not None and ( index % save_freq ) == ( save_freq - 1 ):
+            print('\nMaking checkpoint: Found {num_events} in {num_loc}\n'.format(num_loc=index, num_events=counter))
+            chkpnt_fname = "meetup_events_{num_events}_{num_loc}.json".format(num_events=counter, num_loc=index)
+            chkpnt_path = os.path.join(path_to['raw']['chkpnts']['events'], chkpnt_fname)
+            with open(chkpnt_path, 'w') as f:
+                json.dump(meetup_events_data, f)
+
+        print('Fetched events for {} locations'.format(index), end='\r',)
         
     print('\nBuilding MSA to Meetup bridge complete! Dumping event data to {}\n'.format(path_to_dest))
 
     with open(path_to_dest, 'w') as f:
-        json.dump(msa_meetup_dict, f)
+        json.dump(meetup_events_data, f)
 
 if __name__ == '__main__':
     '''Test script functionality with code stub'''
     parser = argparse.ArgumentParser()
     parser.add_argument('--endpoint', default='locations', help='the meetup api endpoint to scrape')
+    parser.add_argument('--query', default=None, help='optional subfields we are interested in')
     parser.add_argument('--resume', action='store_true', help='flag: resume from checkpoint or not')
     parser.add_argument('--chkpnt_freq', default=None, type=int, help='frequency at which to perform checkpoints' )
 
     args = parser.parse_args()
 
-    if args.endpoint == 'locations':
-        print('\nBuilding bridge to map MSA to meetup events')
-        prop_dict = { 
-                'City': 'city',
-                'Country': 'localized_country_name', 
-                'State': 'state', 
-                'ZipCode': 'zip', 
-                'Latitude': 'lat',
-                'Longitude': 'lon'
+    locations_prop_dict = { 
+        'City': 'city',
+        'Country': 'localized_country_name', 
+        'State': 'state', 
+        'ZipCode': 'zip', 
+        'Latitude': 'lat',
+        'Longitude': 'lon'
+    }
+
+    events_prop_dict = {
+        'topics': {
+            'only': [ 'link', 'group.topics.name', 'name' ],
+            'fields': [ 'group_topics' ]
         }
-        build_meetup_locations_df(path_to['cities'], path_to['meetup_locations'], prop_dict, args.chkpnt_freq, args.resume)
+    }
+
+    if args.endpoint == 'locations':
+        build_meetup_locations_df(path_to['cities'], path_to['meetup_locations'], \
+                                locations_prop_dict, args.chkpnt_freq, args.resume)
 
     elif args.endpoint == 'events':
-        #  check if csv with MSA coordinates exists, build it if it does not
-        if not os.path.isfile(path_to_msa_coords):
-            print('\nBuilding dataframe for MSA coordinates..\n')
-            build_msa_coords_df(path_to['msa_codes'])
+        #  check if the locations dataset exists
+        if not os.path.isfile(path_to['meetup_locations']):
+            build_meetup_locations_df(path_to['cities'], \
+                    path_to['meetup_locations'], locations_prop_dict, \
+                    args.chkpnt_freq, args.resume)
 
-        print('\nBuilding bridge to map MSA to meetup events')
-        build_meetups_msa_mapping(path_to['msa_coords'], path_to['msa_meetups_bridge'])
+        if args.chkpnt_freq is not None:
+            assert os.path.exists(path_to['raw']['chkpnts']['events']), 'Please create checkpoint dir for events!'
+
+        build_meetup_events_data(path_to['meetup_locations'], \
+            path_to['meetup_events'][args.query], \
+            args.query, events_prop_dict[args.query]['only'], \
+            events_prop_dict[args.query]['fields'], args.chkpnt_freq, args.resume)
