@@ -3,8 +3,8 @@
 config
 .env
 
-# ignore raw data related files/folders
-# /data/
+# ignore ipython nb checkpoints
+.ipynb_checkpoints
 
 # ignore swap files and compiled python files
 *.swp
