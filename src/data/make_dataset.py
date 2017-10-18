@@ -128,6 +128,7 @@ def build_meetup_locations_df(path_to_src, path_to_dest, prop_dict, save_freq=No
             meetup_locations_df.to_csv(chkpnt_path, index=False, encoding='latin1')
 
     print('\nBuilding Meetup locations dataframe complete! Dumping event data to {}\n'.format(path_to_dest))
+    meetup_locations_df.drop_duplicates(inplace=True)
     meetup_locations_df.to_csv(path_to['meetup_locations'], inzodex=False, encoding='latin1')
 
 def build_meetup_events_data(path_to_src, path_to_dest, query_type, fields, subfields, save_freq=None, use_checkpoint=False):
