@@ -70,9 +70,12 @@ def fetch_paginated_data(url, data):
         data = data + payload 
 
         #  parse the next url from the Link attribute in response headers
-        if len(payload) and 'Link' in  res_headers: 
-            next_url = res_headers['Link'].split('<')[1].split('>')[0]
-            data = fetch_paginated_data(next_url, data)
+        if len(payload) > 0 and 'Link' in  res_headers: 
+            rel = res_headers['Link'].split('rel=')[1]
+
+            if "next" in rel:
+                next_url = res_headers['Link'].split('<')[1].split('>')[0]
+                data = fetch_paginated_data(next_url, data)
     else:
         #  throttle request_rate
         pass
@@ -84,9 +87,9 @@ def get_chkpnt(path_to_chkpnts):
             "Sorry there is no checkpoint folder at {}".format(path_to_chkpnts)
     checkpoints = [ os.path.join(path_to_chkpnts, fname) for fname in os.listdir(path_to_chkpnts) ]
     latest_chkpnt = max(checkpoints, key=os.path.getctime)
-    #  TODO: figure out how to parse out the numbers
-    num_loc, num_cities =latest_chkpnt.split('.')[0].split('_')[-2:]
-    return int(num_cities) + 1, int(num_loc) + 1, latest_chkpnt
+    tokens = latest_chkpnt.split('.')[0].split('_')
+    numbers = [ int(token) for token in tokens if token.lstrip('-').isdigit() ]
+    return numbers, latest_chkpnt
 
 def filter_events(events, prop_list):
     '''Filter the events to cherry pick only the 'interesting' properties. 
