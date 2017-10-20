@@ -122,12 +122,12 @@ def build_meetup_locations_df(path_to_dest, start_coords, end_coords, coords_ste
                     if location['localized_country_name'] != 'USA':
                         continue
 
-                    meetup_locations_df.loc[counter] = [ value for _, value in list(location.items()) ]
+                    meetup_locations_df.loc[num_locs] = [ value for _, value in list(location.items()) ]
                     num_locs += 1
 
             counter += 1
 
-            print('Scanning {}, {} for locations. Found {}'.format(lon, lat, num_locs), end='\r',)
+            print('Scanned {} coords for locations. Found {}'.format(counter, num_locs), end='\r',)
 
             #  checkpoint at regular intervals if interval is specified
             if save_freq is not None and ( counter % save_freq ) == ( save_freq - 1 ):
@@ -138,43 +138,6 @@ def build_meetup_locations_df(path_to_dest, start_coords, end_coords, coords_ste
     print('\nBuilding Meetup locations dataframe complete! Dumping event data to {}\n'.format(path_to_dest))
     meetup_locations_df.drop_duplicates(inplace=True)
     meetup_locations_df.to_csv(path_to['meetup_locations'], index=False, encoding='latin1')
-     
-    #  for index, row in islice(cities_df.iterrows(), start_idx, None):
-        #  city_name = row['NAME']
-        #  field_names = "%2C".join(list(prop_dict.values()))
-
-        #  try:
-            #  locations_url = locations_endpoint.format(text=city_name, fields=field_names, api_key=os.environ['API_KEY'])
-
-        #  except UnicodeEncodeError:
-            #  pass
-
-        #  #  make the request to the api endpoint
-        #  locations = fetch_paginated_data(locations_url, None) 
-        
-        #  #  add locations only if response returned any for that city
-        #  if len(locations) > 0:
-
-            #  for location in locations:
-
-                #  #  skip locations if not in USA
-                #  if location['localized_country_name'] != 'USA':
-                    #  continue
-
-                #  meetup_locations_df.loc[counter] = [ value for _, value in list(location.items()) ]
-                #  counter += 1
-
-            #  print('Fetched locations for {} meetup cities'.format(index), end='\r',)
-
-        #  #  checkpoint at regular intervals if interval is specified
-        #  if save_freq is not None and ( index % save_freq ) == ( save_freq - 1 ):
-            #  print('\nMaking checkpoint: Found {num_loc} in {num_cities}\n'.format(num_loc=counter, num_cities=index))
-            #  chkpnt_path = path_to['meetup_locations_chkpnt'].format(num_loc=counter, num_cities=index)
-            #  meetup_locations_df.to_csv(chkpnt_path, index=False, encoding='latin1')
-
-    #  print('\nBuilding Meetup locations dataframe complete! Dumping event data to {}\n'.format(path_to_dest))
-    #  meetup_locations_df.drop_duplicates(inplace=True)
-    #  meetup_locations_df.to_csv(path_to['meetup_locations'], inzodex=False, encoding='latin1')
 
 def build_meetup_events_data(path_to_src, path_to_dest, query_type, fields, subfields, save_freq=None, use_checkpoint=False):
     '''Build a mapping between meetup locations and the events happening in it.
