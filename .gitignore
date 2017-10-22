@@ -1,6 +1,5 @@
 # ignore environment and configuration 
 # related files/folders
-config
 .env
 
 # ignore ipython nb checkpoints
