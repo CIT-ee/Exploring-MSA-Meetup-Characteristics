@@ -62,7 +62,6 @@ def fetch_paginated_data(url, data):
         data = [] # initialize the data for first time method is called
 
     payload, res_headers = _make_api_call(url)
-    #  pdb.set_trace()
 
     #  continue hitting endpoint only if something is 
     #  returned in response payload

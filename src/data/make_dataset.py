@@ -21,48 +21,6 @@ meetup_endpoint_for = {
     'locations': 'https://api.meetup.com/find/locations?&sign=true&photo-host=public&lon={lon}&lat={lat}&only={fields}&key={key}'
 }
 
-def build_msa_coords_df(path_to_file):
-    '''Build a new dataframe with latitude longitude information for each MSA.
-    
-    Not all MSA names return a legitimate latlng property when queried through
-    Google/Bing Maps API. So, coordinates are indirectly calculated by fetching
-    the latitude-longitude tuple for an MSA's constituent counties and then
-    calculating the centroid based on those coordinates.
-
-    Keyword arguments:
-    path_to_file -- path to csv file with MSA and child county names (default None)
-    '''
-    cbsa_df = pd.read_csv(path_to_file, encoding='latin1') # base dataframe
-
-    # the dataframe to build
-    msa_coords_df = pd.DataFrame(columns=('Code', 'Name', 'Latitude', 'Longitude'))
-
-    #filter out the rows which are not Metropolitan Statistical Areas
-    msa_codes_df = cbsa_df.loc[cbsa_df.iloc[:, 4] == 'Metropolitan Statistical Area']
-    counter, county_list = 0, []
-    msa_code, msa_name, msa_coords = None, None, None
-
-    for index, row in msa_codes_df.iterrows():
-
-        #  check if new row is pertaining to new MSA, in which case calculate
-        #  the representative coordinates of the MSA based on the coordinates
-        #  of the counties collected so far
-        if msa_code != row['CBSA Code'] and len(county_list) > 0:
-            msa_coords = get_mean_coords(county_list)
-            msa_coords_df.loc[counter] = [int(msa_code), msa_name, msa_coords[0], msa_coords[1]]
-            county_list = [] # clear the county list
-            counter += 1
-            print('{} MSAs explored'.format(counter), end='\r',)
-        
-        #  store the MSA code, name and child counties while its the same MSA as
-        #  the previous row
-        msa_code, msa_name = row['CBSA Code'], row['CBSA Title']
-        county_list.append(row['County/County Equivalent'])
-
-    print("\nBuilding MSA coordinates dataframe complete! Writing data to " + path_to['msa_coords'] + "\n")
-    msa_coords_df.to_csv(path_to['msa_coords'], index=False, encoding='latin1')
-
-
 def build_meetup_locations_df(path_to_dest, start_coords, end_coords, coords_step, prop_dict, save_freq=None, use_checkpoint=False):
     '''Build a dataframe consisting of Meetup locations in US cities.
     
@@ -103,6 +61,8 @@ def build_meetup_locations_df(path_to_dest, start_coords, end_coords, coords_ste
     for lon in range(start_lon, end_lon, lon_step): 
         for lat in range(start_lat, end_lat, lat_step):
 
+            #  not sure why this needs to be done, but raises an exception
+            #  when not put in a try except block
             try:
                 locations_url = locations_endpoint.format(lat=lat, lon=lon, \
                                     fields=field_names, key=os.environ['API_KEY'])
@@ -122,15 +82,15 @@ def build_meetup_locations_df(path_to_dest, start_coords, end_coords, coords_ste
                     if location['localized_country_name'] != 'USA':
                         continue
 
-                    meetup_locations_df.loc[num_locs] = [ value for _, value in list(location.items()) ]
+                    meetup_locations_df.loc[num_locs] = [ location[prop] for prop in list(prop_dict.values()) ]
                     num_locs += 1
 
             counter += 1
 
-            print('Scanned {} coords for locations. Found {}'.format(counter, num_locs), end='\r',)
+            print('Scanned {} coords (currently on ({}, {})) for locations. Found {}'.format(counter, lon, lat, num_locs), end='\r',)
 
             #  checkpoint at regular intervals if interval is specified
-            if save_freq is not None and ( counter % save_freq ) == ( save_freq - 1 ):
+            if save_freq is not None and ( counter % save_freq ) == save_freq:
                 print('\nMaking checkpoint: Found {num_loc} locations\n'.format(num_loc=num_locs))
                 chkpnt_path = path_to['meetup_locations_chkpnt'].format(num_loc=num_locs, lat=lat, lon=lon)
                 meetup_locations_df.to_csv(chkpnt_path, index=False, encoding='latin1')
@@ -157,41 +117,43 @@ def build_meetup_events_data(path_to_src, path_to_dest, query_type, fields, subf
     use_checkpoint -- flag indicating whether to resume from a previous
     '''
     meetup_locations_df = pd.read_csv(path_to_src, encoding='latin1')
-    valid_meetup_locations_df = meetup_locations_df[meetup_locations_df['Is_Incorporated']]
-    events_endpoint, counter, start_idx = meetup_endpoint_for['events'][query_type], 0, 0
+    events_endpoint, num_events, num_locs, start_idx = meetup_endpoint_for['events'][query_type], 0, 0, 0
 
     #  load target data store from a checkpoint if specified
     if use_checkpoint:
-        start_idx, counter, chkpnt_path = get_chkpnt(path_to['raw']['chkpnts']['locations'])
+        scraping_stats, chkpnt_path = get_chkpnt(path_to['raw']['chkpnts']['events'])
+        start_idx, num_events, num_locs = scraping_stats
         with open(chkpnt_path, 'r') as f:
             meetup_events_data = json.load(f)
     else:
-        meetup_events_data = []
+        meetup_events_data = {} 
 
     print('\nBuilding meetup location - meetup event bridge. Please wait..')
     #  start iterating over dataframe from last stopping point
-    for index, row in islice(valid_meetup_locations_df.iterrows(), start_idx, None):
+    for index, row in islice(meetup_locations_df.iterrows(), start_idx, None):
 
         #  pull the meetup location coordinates, query for events around those 
         #  coordinates, and store interesting properties from the response
         loc_lat, loc_lng = row['Latitude'], row['Longitude']
+        loc_id = ", ".join([ str(loc_lng), str(loc_lat) ])
         field_names, subfield_name = ",".join(fields), ",".join(subfields)
         events_url = events_endpoint.format(lat=loc_lat, lon=loc_lng, \
                         fields=field_names, optional_fields=subfield_name, \
                         api_key=os.environ['API_KEY'])
         events_data = fetch_paginated_data(events_url, None)
-        counter += len(events_data)
-        meetup_events_data.append(events_data)
+        num_events += len(events_data)
+        num_locs += 1
+        meetup_events_data[loc_id] = events_data
 
         #  checkpoint at regular intervals if interval is specified
-        if save_freq is not None and ( index % save_freq ) == ( save_freq - 1 ):
-            print('\nMaking checkpoint: Found {num_events} in {num_loc}\n'.format(num_loc=index, num_events=counter))
-            chkpnt_fname = "meetup_events_{num_events}_{num_loc}.json".format(num_events=counter, num_loc=index)
+        if save_freq is not None and ( num_locs % save_freq ) == save_freq: 
+            print('\nMaking checkpoint: Found {num_events} in {num_loc}\n'.format(num_loc=num_locs, num_events=num_events))
+            chkpnt_fname = "meetup_events_{loc_idx}_{num_events}_{num_locs}.json"
             chkpnt_path = os.path.join(path_to['raw']['chkpnts']['events'], chkpnt_fname)
-            with open(chkpnt_path, 'w') as f:
+            with open(chkpnt_path.format(num_locs=num_locs, num_events=num_events, loc_idx=index), 'w') as f:
                 json.dump(meetup_events_data, f)
 
-        print('Fetched events for {} locations'.format(index), end='\r',)
+        print('Fetched events for {} locations'.format(num_locs), end='\r',)
         
     print('\nBuilding MSA to Meetup bridge complete! Dumping event data to {}\n'.format(path_to_dest))
 
@@ -208,47 +170,47 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    locations_prop_dict = { 
-        'City': 'city',
-        'Country': 'localized_country_name', 
-        'State': 'state', 
-        'ZipCode': 'zip', 
-        'Latitude': 'lat',
-        'Longitude': 'lon'
-    }
-
-    events_prop_dict = {
-        'topics': {
-            'only': [ 'link', 'group.topics.name', 'name' ],
-            'fields': [ 'group_topics' ]
+    prop_dict = { 
+        'locations': {
+            'City': 'city',
+            'Country': 'localized_country_name', 
+            'State': 'state', 
+            'ZipCode': 'zip', 
+            'Latitude': 'lat',
+            'Longitude': 'lon'
+        },
+        'events':{
+            'topics': {
+                'only': [ 'id', 'time', 'venue.id', 'venue.zip', 'status', 'group.topics.name' ],
+                'fields': [ 'group_topics' ]
+            }
         }
     }
 
-    if args.endpoint == 'locations':
-        path_to_chkpnts = path_to['raw']['chkpnts'][args.endpoint]
+    path_to_chkpnts = path_to['raw']['chkpnts'][args.endpoint]
         
-        if args.resume:
-            assert len(os.listdir(path_to_chkpnts)) > 0, \
-                'Sorry no checkpoints found at {}. Please create checkpoints first'.format(path_to_chkpnts)
-        
-        if args.chkpnt_freq is not None:
-            assert os.path.exists(path_to_chkpnts), \
-                    'Sorry the checkpoint directory at {} does not exist yet!'.format(path_to_chkpnts)
+    #  check if there is a checkpoint store to resume from 
+    if args.resume:
+        assert len(os.listdir(path_to_chkpnts)) > 0, \
+            'Sorry no checkpoints found at {}. Please create checkpoints first'.format(path_to_chkpnts)
+    
+    #  check there is directory to store checkpoints in
+    if args.chkpnt_freq is not None:
+        assert os.path.exists(path_to_chkpnts), \
+            'Sorry the checkpoint directory at {} does not exist yet!'.format(path_to_chkpnts)
 
+    #  check which api endpoint to scrape
+    if args.endpoint == 'locations':
+        
         build_meetup_locations_df(path_to['meetup_locations'], (-125, 24), (-67, 49), (1,1),
-                                locations_prop_dict, args.chkpnt_freq, args.resume)
+                                prop_dict[args.endpoint], args.chkpnt_freq, args.resume)
 
     elif args.endpoint == 'events':
-        #  check if the locations dataset exists
-        if not os.path.isfile(path_to['meetup_locations']):
-            build_meetup_locations_df(path_to['cities'], \
-                    path_to['meetup_locations'], locations_prop_dict, \
-                    args.chkpnt_freq, args.resume)
 
-        if args.chkpnt_freq is not None:
-            assert os.path.exists(path_to['raw']['chkpnts']['events']), 'Please create checkpoint dir for events!'
+        #  dependency: check if the locations dataset exists
+        assert os.path.exists(path_to['meetup_locations']), \
+            'Events scraping has a dependency on locations data. Please build that first!'
 
-        build_meetup_events_data(path_to['meetup_locations'], \
-            path_to['meetup_events'][args.query], \
-            args.query, events_prop_dict[args.query]['only'], \
-            events_prop_dict[args.query]['fields'], args.chkpnt_freq, args.resume)
+        build_meetup_events_data(path_to['meetup_locations'], path_to['meetup_events'][args.query], \
+            args.query, prop_dict[args.endpoint][args.query]['only'], \
+            prop_dict[args.endpoint][args.query]['fields'], args.chkpnt_freq, args.resume)
