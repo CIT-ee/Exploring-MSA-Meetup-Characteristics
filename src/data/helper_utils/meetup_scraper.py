@@ -81,11 +81,30 @@ def fetch_paginated_data(url, data):
 
     return data
 
-def get_chkpnt(path_to_chkpnts):
+def get_chkpnt(path_to_chkpnts, keyword=None):
+    '''Get the latest checkpoint from the specified checkpoint store
+    
+    Keyword arguments:
+    path_to_chkpnts -- path to the directory where the checkpoints are being stored ( default: None )
+    keyword -- used to filter out non relevant checkpoints in case a single directory is being
+                used to store checkpoints for related but different data
+    '''
+    #  check if the path to the checkpoint store exists
     assert os.path.exists(path_to_chkpnts), \
             "Sorry there is no checkpoint folder at {}".format(path_to_chkpnts)
-    checkpoints = [ os.path.join(path_to_chkpnts, fname) for fname in os.listdir(path_to_chkpnts) ]
+    
+    #  get list of paths to relevant checkpoints
+    checkpoints = [ os.path.join(path_to_chkpnts, fname) \
+                    for fname in os.listdir(path_to_chkpnts) ]
+    if keyword is not None:
+        checkpoints = [ os.path.join(path_to_chkpnts, fname) \
+                        for fname in os.listdir(path_to_chkpnts) if keyword in fname ]
+
+    #  get the latest file (in terms of date created) in the list of checkpoints
     latest_chkpnt = max(checkpoints, key=os.path.getctime)
+
+    #  extract information about stopping point in scraping process 
+    #  from the checkpoint filename
     tokens = latest_chkpnt.split('.')[0].split('_')
     numbers = [ int(token) for token in tokens if token.lstrip('-').isdigit() ]
     return numbers, latest_chkpnt
