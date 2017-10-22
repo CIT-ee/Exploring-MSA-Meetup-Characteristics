@@ -10,6 +10,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecurePlatformWarning)
 
 #  import local modules
 from config.resources import path_to
+from config.api_specs import props_for
 from src.data.helper_utils.msa_data_builder import get_mean_coords
 from src.data.helper_utils.meetup_scraper import fetch_paginated_data, filter_events, get_chkpnt 
 
@@ -174,27 +175,6 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    prop_dict = { 
-        'locations': {
-            'City': 'city',
-            'Country': 'localized_country_name', 
-            'State': 'state', 
-            'ZipCode': 'zip', 
-            'Latitude': 'lat',
-            'Longitude': 'lon'
-        },
-        'events':{
-            'topics': {
-                'only': [ 'id', 'time', 'venue.id', 'venue.zip', 'status', 'group.topics.name' ],
-                'fields': [ 'group_topics' ]
-            },
-            'attendance': {
-                'only': [ 'id', 'time', 'venue.id', 'venue.zip', 'status', 'rsvp_limit', 'yes_rsvp' ],
-                'fields': [ ]
-            } 
-        }
-    }
-
     path_to_chkpnts = path_to['raw']['chkpnts'][args.endpoint]
         
     #  check if there is a checkpoint store to resume from 
@@ -211,7 +191,7 @@ if __name__ == '__main__':
     if args.endpoint == 'locations':
         
         build_meetup_locations_df(path_to['meetup_locations'], (-125, 24), (-67, 49), (1,1),
-                                prop_dict[args.endpoint], args.chkpnt_freq, args.resume)
+                                props_for[args.endpoint], args.chkpnt_freq, args.resume)
 
     elif args.endpoint == 'events':
 
@@ -220,5 +200,5 @@ if __name__ == '__main__':
             'Events scraping has a dependency on locations data. Please build that first!'
 
         build_meetup_events_data(path_to['meetup_locations'], path_to['meetup_events'][args.query], \
-            args.query, prop_dict[args.endpoint][args.query]['only'], \
-            prop_dict[args.endpoint][args.query]['fields'], args.chkpnt_freq, args.resume)
+            args.query, props_for[args.endpoint][args.query]['only'], \
+            props_for[args.endpoint][args.query]['fields'], args.chkpnt_freq, args.resume)
