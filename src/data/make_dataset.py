@@ -16,7 +16,8 @@ from src.data.helper_utils.meetup_scraper import fetch_paginated_data, filter_ev
 
 meetup_endpoint_for = {
     'events': {
-        'topics': 'https://api.meetup.com/find/events?&sign=true&photo-host=public&lon={lon}&fields={optional_fields}&lat={lat}&only={fields}&key={api_key}'
+        'topics': 'https://api.meetup.com/find/events?&sign=true&photo-host=public&lon={lon}&fields={optional_fields}&lat={lat}&only={fields}&key={api_key}',
+        'attendance': 'https://api.meetup.com/find/events?&sign=true&photo-host=public&lon={lon}&fields={optional_fields}&lat={lat}&only={fields}&key={api_key}'
     },
     'locations': 'https://api.meetup.com/find/locations?&sign=true&photo-host=public&lon={lon}&lat={lat}&only={fields}&key={key}'
 }
@@ -58,6 +59,7 @@ def build_meetup_locations_df(path_to_dest, start_coords, end_coords, coords_ste
     else:
         meetup_locations_df = pd.DataFrame(columns=prop_dict.keys())
 
+    print('\nBuilding meetup locations dataframe. Please wait..')
     for lon in range(start_lon, end_lon, lon_step): 
         for lat in range(start_lat, end_lat, lat_step):
 
@@ -90,7 +92,7 @@ def build_meetup_locations_df(path_to_dest, start_coords, end_coords, coords_ste
             print('Scanned {} coords (currently on ({}, {})) for locations. Found {}'.format(counter, lon, lat, num_locs), end='\r',)
 
             #  checkpoint at regular intervals if interval is specified
-            if save_freq is not None and ( counter % save_freq ) == save_freq:
+            if save_freq is not None and ( counter % save_freq ) == 0:
                 print('\nMaking checkpoint: Found {num_loc} locations\n'.format(num_loc=num_locs))
                 chkpnt_path = path_to['meetup_locations_chkpnt'].format(num_loc=num_locs, lat=lat, lon=lon)
                 meetup_locations_df.to_csv(chkpnt_path, index=False, encoding='latin1')
@@ -121,7 +123,7 @@ def build_meetup_events_data(path_to_src, path_to_dest, query_type, fields, subf
 
     #  load target data store from a checkpoint if specified
     if use_checkpoint:
-        scraping_stats, chkpnt_path = get_chkpnt(path_to['raw']['chkpnts']['events'])
+        scraping_stats, chkpnt_path = get_chkpnt(path_to['raw']['chkpnts']['events'], query_type)
         start_idx, num_events, num_locs = scraping_stats
         with open(chkpnt_path, 'r') as f:
             meetup_events_data = json.load(f)
@@ -146,16 +148,18 @@ def build_meetup_events_data(path_to_src, path_to_dest, query_type, fields, subf
         meetup_events_data[loc_id] = events_data
 
         #  checkpoint at regular intervals if interval is specified
-        if save_freq is not None and ( num_locs % save_freq ) == save_freq: 
+        if save_freq is not None and ( num_locs % save_freq ) == 0: 
             print('\nMaking checkpoint: Found {num_events} in {num_loc}\n'.format(num_loc=num_locs, num_events=num_events))
-            chkpnt_fname = "meetup_events_{loc_idx}_{num_events}_{num_locs}.json"
-            chkpnt_path = os.path.join(path_to['raw']['chkpnts']['events'], chkpnt_fname)
-            with open(chkpnt_path.format(num_locs=num_locs, num_events=num_events, loc_idx=index), 'w') as f:
+            chkpnt_fname = "meetup_events_{query}_{loc_idx}_{num_events}_{num_locs}.json"
+            chkpnt_path = os.path.join(path_to['raw']['chkpnts']['events'], \
+                            chkpnt_fname.format(query=query_type, num_locs=num_locs, \
+                            num_events=num_events, loc_idx=index))
+            with open(chkpnt_path, 'w') as f:
                 json.dump(meetup_events_data, f)
 
         print('Fetched events for {} locations'.format(num_locs), end='\r',)
         
-    print('\nBuilding MSA to Meetup bridge complete! Dumping event data to {}\n'.format(path_to_dest))
+    print('\nBuilding meetup location - meetup event bridge complete! Dumping event data to {}\n'.format(path_to_dest))
 
     with open(path_to_dest, 'w') as f:
         json.dump(meetup_events_data, f)
@@ -183,7 +187,11 @@ if __name__ == '__main__':
             'topics': {
                 'only': [ 'id', 'time', 'venue.id', 'venue.zip', 'status', 'group.topics.name' ],
                 'fields': [ 'group_topics' ]
-            }
+            },
+            'attendance': {
+                'only': [ 'id', 'time', 'venue.id', 'venue.zip', 'status', 'rsvp_limit', 'yes_rsvp' ],
+                'fields': [ ]
+            } 
         }
     }
 
