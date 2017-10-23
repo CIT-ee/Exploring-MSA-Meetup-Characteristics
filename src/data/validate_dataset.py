@@ -71,4 +71,3 @@ def validate_cities(path_to_src, path_to_ref):
 if __name__ == '__main__':
     '''stub to test the script'''
     validate_cities(path_to['meetup_locations'], path_to['incorporated_places'])
-    pass
