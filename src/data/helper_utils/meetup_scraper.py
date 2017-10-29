@@ -30,16 +30,11 @@ def _make_api_call(url):
 
     sleep(pause_time) 
 
-    if res.status_code == 401:
-        print('Got 401 status code')
-        pdb.set_trace() #  TODO: deal with 401 errors
+    if res.status_code >= 400:
+        print('URL in question: ', url)
+        print(res.json())
+        pdb.set_trace() #  TODO: deal with request errors
         
-    elif res.status_code == 429:
-        #  TODO: deal with when api warns of request 
-        #  rate limit overflow
-        print('Got 429 status code')
-        pdb.set_trace()
-
     # make sure the server responded with OK status
     elif res.status_code == requests.codes.ok:
         return res.json(), res.headers
