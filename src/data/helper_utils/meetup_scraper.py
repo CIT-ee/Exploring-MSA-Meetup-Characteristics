@@ -1,5 +1,5 @@
 from __future__ import print_function
-import os, requests, pdb
+import os, requests, pandas as pd, pdb
 from time import sleep
 
 
@@ -42,6 +42,31 @@ def _make_api_call(url):
     # default value to return to indicate something went wrong
     return None
 
+def _flatten_dict(d, delimiter=':'):
+
+    def _expand_key_value(key, value):
+        if isinstance(value, dict):
+            return [
+                (delimiter.join([key, k]), v)
+                for k, v in _flatten_dict(value, delimiter).items()
+            ]
+        else:
+            return [(key, value)]
+    
+    return dict(
+        [item for k, v in d.items() for item in _expand_key_value(k, v)]
+    )
+
+def _flatten_nested_data(data):
+    #  hack to turn list of objects to just list
+    group_topic_names = []
+    for topic in data['group']['topics']:
+        group_topic_names.append(topic['name'])
+    data['group']['topics'] = { 'name': group_topic_names }
+
+    #  flatten nested dict
+    return _flatten_dict(data, delimiter='.')
+
 def fetch_paginated_data(url, data):
     '''Scrape an endpoint of the Meetup API that supports Link Header Pagination.
 
@@ -75,6 +100,19 @@ def fetch_paginated_data(url, data):
         pass
 
     return data
+
+def get_df_from_nested_dicts(dict_ls, column_names):
+    flattened_dict_ls = []
+    
+    for nested_dict in dict_ls:
+        flattened_dict_ls.append(_flatten_nested_data(nested_dict))
+    
+    flat_df = pd.DataFrame(flattened_dict_ls)
+    try:
+        flat_df_reordered = flat_df[column_names]
+    except KeyError:
+        pdb.set_trace()
+    return flat_df_reordered
 
 def get_chkpnt(path_to_chkpnts, keyword=None):
     '''Get the latest checkpoint from the specified checkpoint store
