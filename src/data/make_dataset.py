@@ -15,7 +15,6 @@ from src.data.helper_utils.msa_data_builder import get_mean_coords
 from src.data.helper_utils.meetup_scraper import ( fetch_paginated_data, 
                                                 get_df_from_nested_dicts, get_chkpnt )
 
-
 meetup_endpoint_for = {
     'events': {
         'topics': 'https://api.meetup.com/find/events?&sign=true&photo-host=public&lon={lon}&fields={optional_fields}&lat={lat}&only={fields}&key={api_key}',
@@ -23,6 +22,11 @@ meetup_endpoint_for = {
     },
     'locations': 'https://api.meetup.com/find/locations?&sign=true&photo-host=public&lon={lon}&lat={lat}&only={fields}&key={key}'
 }
+
+def _add_location_information(event_ls, lat, lon):
+    for event in event_ls:
+        event['latitude'], event['longitude'] = lat, lon
+    return event_ls
 
 def build_meetup_locations_df(path_to_dest, start_coords, end_coords, coords_step, prop_dict, save_freq=None, use_checkpoint=False):
     '''Build a dataframe consisting of Meetup locations in US cities.
@@ -129,7 +133,7 @@ def build_meetup_events_data(path_to_src, path_to_dest, query_type, fields, subf
         start_idx, num_events, num_locs = scraping_stats
         meetup_events_df = pd.read_csv(chkpnt_path, encoding='latin1')
     else:
-        meetup_events_df = pd.DataFrame(columns=fields) 
+        meetup_events_df = pd.DataFrame(columns= fields + [ 'latitude', 'longitude' ]) 
 
     print('\nBuilding meetup location - meetup event bridge. Please wait..')
     #  start iterating over dataframe from last stopping point
@@ -149,7 +153,9 @@ def build_meetup_events_data(path_to_src, path_to_dest, query_type, fields, subf
         if len(events_data) == 0:
             continue
         
-        events_batch_df = get_df_from_nested_dicts(events_data, fields)
+        events_data = _add_location_information(events_data, loc_lat, loc_lng)
+        events_batch_df = get_df_from_nested_dicts(events_data, \
+                                meetup_events_df.columns.tolist())
         num_events += len(events_data)
         meetup_events_df = meetup_events_df.append(events_batch_df)
 
