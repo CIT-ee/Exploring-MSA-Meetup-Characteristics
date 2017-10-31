@@ -161,12 +161,15 @@ def build_meetup_events_data(path_to_src, path_to_dest, query_type, fields, subf
 
         #  checkpoint at regular intervals if interval is specified
         if save_freq is not None and ( num_locs % save_freq ) == 0: 
+
+            #  trim dataframe of redundant rows for smaller write size
+            meetup_events_df.drop_duplicates(subset='id', inplace=True)
+            num_events = meetup_events_df.shape[0]
+
             print('\nMaking checkpoint: Found {num_events} in {num_loc}\n'.format(num_loc=num_locs, num_events=num_events))
             chkpnt_fname_template = "meetup_events_{query}_{loc_idx}_{num_events}_{num_locs}.csv"
-            chkpnt_fname = chkpnt_fname_template.format(query=query_type, \
-                                                        num_locs=num_locs, \
-                                                        num_events=num_events, \
-                                                        loc_idx=index)
+            chkpnt_fname = chkpnt_fname_template.format(query=query_type, num_locs=num_locs, \
+                                                        num_events=num_events, loc_idx=index)
             chkpnt_path = os.path.join(path_to['raw']['chkpnts']['events'], \
                                         chkpnt_fname)
             meetup_events_df.to_csv(chkpnt_path, index=False, encoding='latin1')
