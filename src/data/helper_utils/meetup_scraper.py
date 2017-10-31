@@ -43,7 +43,6 @@ def _make_api_call(url):
     return None
 
 def _flatten_dict(d, delimiter=':'):
-
     def _expand_key_value(key, value):
         if isinstance(value, dict):
             return [
@@ -57,15 +56,14 @@ def _flatten_dict(d, delimiter=':'):
         [item for k, v in d.items() for item in _expand_key_value(k, v)]
     )
 
-def _flatten_nested_data(data):
+def _convert_dict_list_to_list(data):
     #  hack to turn list of objects to just list
-    group_topic_names = []
-    for topic in data['group']['topics']:
-        group_topic_names.append(topic['name'])
-    data['group']['topics'] = { 'name': group_topic_names }
+    group_category_ids = []
+    for topic in data['group']['category']:
+        group_category_ids.append(topic['id'])
+    data['group']['category'] = { 'id': group_category_ids }
 
-    #  flatten nested dict
-    return _flatten_dict(data, delimiter='.')
+    return data
 
 def fetch_paginated_data(url, data):
     '''Scrape an endpoint of the Meetup API that supports Link Header Pagination.
@@ -105,7 +103,7 @@ def get_df_from_nested_dicts(dict_ls, column_names):
     flattened_dict_ls = []
     
     for nested_dict in dict_ls:
-        flattened_dict_ls.append(_flatten_nested_data(nested_dict))
+        flattened_dict_ls.append(_flatten_dict(nested_dict, delimiter='.'))
     
     flat_df = pd.DataFrame(flattened_dict_ls)
     try:
