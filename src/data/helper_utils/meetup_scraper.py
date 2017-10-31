@@ -103,8 +103,23 @@ def get_df_from_nested_dicts(dict_ls, column_names):
     flattened_dict_ls = []
     
     for nested_dict in dict_ls:
-        flattened_dict_ls.append(_flatten_dict(nested_dict, delimiter='.'))
+        flat_dict = _flatten_dict(nested_dict, delimiter='.')
+
+        #  check if resulting dict has all keys as required
+        if set(column_names) != set(flat_dict.keys()):
+            missing_keys = set(column_names) - set(flat_dict.keys())
+            extra_keys = set(flat_dict.keys()) - set(column_names)
+
+            #  unlikely, but remove any extraneous keys
+            for extra_key in extra_keys:
+                del flat_dict[extra_key]
+
+            #  add missing keys with None as value
+            for missing_key in missing_keys:
+                flat_dict[missing_key] = None
     
+        flattened_dict_ls.append(flat_dict)
+
     flat_df = pd.DataFrame(flattened_dict_ls)
     try:
         flat_df_reordered = flat_df[column_names]
