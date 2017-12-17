@@ -178,7 +178,8 @@ def build_meetup_events_data(path_to_src, path_to_dest, query_type, fields, subf
         
     print('\nBuilding meetup location - meetup event bridge complete! Dumping event data to {}\n'.format(path_to_dest))
 
-    meetup_events_df.drop_duplicates(inplace=True)
+    meetup_events_df.drop_duplicates(subset='id', inplace=True)
+
     meetup_events_df.to_csv(path_to_dest, index=False, encoding='latin1')
 
 if __name__ == '__main__':
@@ -205,12 +206,10 @@ if __name__ == '__main__':
 
     #  check which api endpoint to scrape
     if args.endpoint == 'locations':
-        
         build_meetup_locations_df(path_to['meetup_locations'], (-125, 24), (-67, 49), (1,1),
                                 props_for[args.endpoint], args.chkpnt_freq, args.resume)
 
     elif args.endpoint == 'events':
-
         #  dependency: check if the locations dataset exists
         assert os.path.exists(path_to['meetup_locations']), \
             'Events scraping has a dependency on locations data. Please build that first!'
