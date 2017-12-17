@@ -189,6 +189,7 @@ if __name__ == '__main__':
     parser.add_argument('--query', default=None, help='optional subfields we are interested in')
     parser.add_argument('--resume', action='store_true', help='flag: resume from checkpoint or not')
     parser.add_argument('--chkpnt_freq', default=None, type=int, help='frequency at which to perform checkpoints' )
+    parser.add_argument('--batch', type=int, default=0, help='batch number of the locations to operate on')
 
     args = parser.parse_args()
 
@@ -211,9 +212,18 @@ if __name__ == '__main__':
 
     elif args.endpoint == 'events':
         #  dependency: check if the locations dataset exists
-        assert os.path.exists(path_to['meetup_locations']), \
+        path_to_locs = path_to['meetup_locations'].format(args.batch)
+        assert os.path.exists(path_to_locs), \
             'Events scraping has a dependency on locations data. Please build that first!'
 
-        build_meetup_events_data(path_to['meetup_locations'], path_to['meetup_events'][args.query], \
-            args.query, props_for[args.endpoint][args.query]['only'], \
-            props_for[args.endpoint][args.query]['fields'], args.chkpnt_freq, args.resume)
+        path_to_dest = path_to['meetup_events'][args.query].format(args.batch)
+
+        path_to_dest_dir = os.path.dirname(path_to_dest)
+        assert os.path.exists(path_to_dest_dir), \
+            'Destination directory does not exist at {}. Please build that first!'.format(path_to_dest_dir)
+
+        props_for_query = props_for[args.endpoint][args.query]
+
+        build_meetup_events_data(path_to_locs, path_to_dest, args.query, 
+                                props_for_query['only'], props_for_query['fields'], \
+                                args.chkpnt_freq, args.resume)
