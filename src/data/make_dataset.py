@@ -17,8 +17,8 @@ from src.data.helper_utils.meetup_scraper import ( fetch_paginated_data,
 
 meetup_endpoint_for = {
     'events': {
-        'topics': 'https://api.meetup.com/find/events?&sign=true&photo-host=public&lon={lon}&fields={optional_fields}&lat={lat}&only={fields}&key={api_key}',
-        'attendance': 'https://api.meetup.com/find/events?&sign=true&photo-host=public&lon={lon}&fields={optional_fields}&lat={lat}&only={fields}&key={api_key}'
+        'topics': 'https://api.meetup.com/find/events?&sign=true&photo-host=public&lon={lon}&radius=0&fields={optional_fields}&lat={lat}&only={fields}&key={api_key}',
+        'attendance': 'https://api.meetup.com/find/events?&sign=true&photo-host=public&lon={lon}&radius=0&fields={optional_fields}&lat={lat}&only={fields}&key={api_key}'
     },
     'locations': 'https://api.meetup.com/find/locations?&sign=true&photo-host=public&lon={lon}&lat={lat}&only={fields}&key={key}'
 }
