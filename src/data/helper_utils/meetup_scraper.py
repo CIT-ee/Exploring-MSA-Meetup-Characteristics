@@ -92,7 +92,7 @@ def fetch_paginated_data(url, data):
 
             if "next" in rel:
                 next_url = res_headers['Link'].split('<')[1].split('>')[0]
-                data = fetch_paginated_data(next_url, data)
+                data = fetch_paginated_data(next_url + '&key=' + os.environ['API_KEY'], data)
     else:
         #  throttle request_rate
         pass
