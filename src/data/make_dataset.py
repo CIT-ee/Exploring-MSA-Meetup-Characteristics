@@ -20,6 +20,7 @@ meetup_endpoint_for = {
         'topics': 'https://api.meetup.com/find/events?&sign=true&photo-host=public&lon={lon}&radius=0&fields={optional_fields}&lat={lat}&only={fields}&key={api_key}',
         'attendance': 'https://api.meetup.com/find/events?&sign=true&photo-host=public&lon={lon}&radius=0&fields={optional_fields}&lat={lat}&only={fields}&key={api_key}'
     },
+    'groups': 'https://api.meetup.com/find/groups?&sign=true&photo-host=public&lon={lon}&fields={optionals}&lat={lat}&page=20&only={fields}&key={api_key}',
     'locations': 'https://api.meetup.com/find/locations?&sign=true&photo-host=public&lon={lon}&lat={lat}&only={fields}&key={key}'
 }
 
@@ -182,6 +183,75 @@ def build_meetup_events_data(path_to_src, path_to_dest, query_type, fields, subf
 
     meetup_events_df.to_csv(path_to_dest, index=False, encoding='latin1')
 
+def build_meetup_groups_data(path_to_src, path_to_dest, fields, optionals, save_freq=None, use_checkpoint=False):
+    '''Build a mapping between meetup locations and the groups formed around it.
+
+    Even after using request throttling to stay within the API's request rate 
+    limits, the server disconnects without warning. To overcome that, 
+    checkpointing is employed.
+    
+    Keyword arguments:
+    path_to_src -- path to csv file with MSA name and coordinates (default: None)
+    path_to_dest -- path to csv file with the mapping between MSA and groups (default: None)
+    fields -- fields to filter the request with (default: None)
+    optionals -- optional fields to include in response (default: None)
+    save_freq -- interval (in terms of cities explored) after which to 
+                checkpoint (default: None)
+    use_checkpoint -- flag indicating whether to resume from a previous
+    '''
+    meetup_locations_df = pd.read_csv(path_to_src, encoding='latin1')
+    groups_endpoint = meetup_endpoint_for['groups']
+    groups_batches, num_groups, num_locs, start_idx = [], 0, 0, 0
+    nrows, _ = meetup_locations_df.shape
+
+    #  load target data store from a checkpoint if specified
+    if use_checkpoint:
+        scraping_stats, chkpnt_path = get_chkpnt(path_to['raw']['chkpnts']['groups'], None)
+        start_idx, num_groups, num_locs = scraping_stats
+        meetup_groups_df = pd.read_csv(chkpnt_path, encoding='utf-8')
+
+    print('\nBuilding meetup location - meetup groups bridge. Please wait..')
+    #  start iterating over dataframe from last stopping point
+    for index, row in islice(meetup_locations_df.iterrows(), start_idx, None):
+
+        #  pull the meetup location coordinates, query for groups around those 
+        #  coordinates, and store interesting properties from the response
+        loc_lat, loc_lng = row['Latitude'], row['Longitude']
+        field_names, optionals_names = ",".join(fields), ",".join(optionals)
+        groups_url = groups_endpoint.format(lat=loc_lat, lon=loc_lng, \
+                        fields=field_names, optionals=optionals_names, \
+                        api_key=os.environ['API_KEY'])
+        groups_data = fetch_paginated_data(groups_url, None)
+        num_locs += 1
+
+        #  skip adding to the dataframe if request returned no data in response
+        if len(groups_data) == 0:
+            continue
+        
+        groups_batches.append(get_df_from_nested_dicts(groups_data)) 
+
+        #  meetup_groups_df = meetup_groups_df.append(groups_batch_df)
+
+        #  checkpoint at regular intervals if interval is specified
+        if save_freq is not None and ( num_locs % save_freq ) == 0: 
+
+            #  trim dataframe of redundant rows for smaller write size
+            meetup_groups_df.drop_duplicates(subset='id', inplace=True)
+            num_groups = meetup_groups_df.shape[0]
+
+            print('\nMaking checkpoint: Found {} in {}\n'.format(num_locs, num_groups))
+            chkpnt_fname_template = "meetup_groups_{loc_idx}_{num_groups}_{num_locs}.csv"
+            chkpnt_fname = chkpnt_fname_template.format(num_locs=num_locs, num_events=num_events, loc_idx=index)
+            chkpnt_path = os.path.join(path_to['raw']['chkpnts']['groups'], chkpnt_fname)
+            meetup_groups_.to_csv(chkpnt_path, index=False, encoding='utf-8')
+
+        print('Fetched groups for {} out of {} locations'.format(num_locs, nrows), end='\r',)
+        
+    meetup_groups_df = pd.concat(groups_batches).reset_index(drop=True)
+    meetup_groups_df.drop_duplicates(subset='id', inplace=True)
+    meetup_groups_df.to_csv(path_to_dest, index=False, encoding='utf-8')
+    print('\nBuilding meetup location - meetup groups bridge complete! Dumping groups data to {}\n'.format(path_to_dest))
+
 if __name__ == '__main__':
     '''Test script functionality with code stub'''
     parser = argparse.ArgumentParser()
@@ -227,3 +297,20 @@ if __name__ == '__main__':
         build_meetup_events_data(path_to_locs, path_to_dest, args.query, 
                                 props_for_query['only'], props_for_query['fields'], \
                                 args.chkpnt_freq, args.resume)
+    
+    elif args.endpoint == 'groups':
+        #  dependency: check if the locations dataset exists
+        path_to_locs = path_to['meetup_locations_batch'].format(args.batch)
+        assert os.path.exists(path_to_locs), \
+            'Groups scraping has a dependency on locations data. Please build that first!'
+
+        path_to_dest = path_to['meetup_groups_batch'].format(args.batch)
+
+        path_to_dest_dir = os.path.dirname(path_to_dest)
+        assert os.path.exists(path_to_dest_dir), \
+            'Destination directory does not exist at {}. Please build that first!'.format(path_to_dest_dir)
+
+        props_for_query = props_for[args.endpoint]
+
+        build_meetup_groups_data(path_to_locs, path_to_dest, props_for_query['only'], 
+                                props_for_query['fields'], args.chkpnt_freq, args.resume)

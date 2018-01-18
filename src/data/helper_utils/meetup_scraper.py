@@ -44,7 +44,7 @@ def _make_api_call(url):
 
 def _flatten_dict(d, delimiter=':'):
     def _expand_key_value(key, value):
-        if isinstance(value, dict):
+        if isinstance(value, dict) and len(value.keys()) > 0:
             return [
                 (delimiter.join([key, k]), v)
                 for k, v in _flatten_dict(value, delimiter).items()
@@ -99,33 +99,14 @@ def fetch_paginated_data(url, data):
 
     return data
 
-def get_df_from_nested_dicts(dict_ls, column_names):
+def get_df_from_nested_dicts(dict_ls):
     flattened_dict_ls = []
     
     for nested_dict in dict_ls:
         flat_dict = _flatten_dict(nested_dict, delimiter='.')
-
-        #  check if resulting dict has all keys as required
-        if set(column_names) != set(flat_dict.keys()):
-            missing_keys = set(column_names) - set(flat_dict.keys())
-            extra_keys = set(flat_dict.keys()) - set(column_names)
-
-            #  unlikely, but remove any extraneous keys
-            for extra_key in extra_keys:
-                del flat_dict[extra_key]
-
-            #  add missing keys with None as value
-            for missing_key in missing_keys:
-                flat_dict[missing_key] = None
-    
         flattened_dict_ls.append(flat_dict)
 
-    flat_df = pd.DataFrame(flattened_dict_ls)
-    try:
-        flat_df_reordered = flat_df[column_names]
-    except KeyError:
-        pdb.set_trace()
-    return flat_df_reordered
+    return pd.DataFrame(flattened_dict_ls)
 
 def get_chkpnt(path_to_chkpnts, keyword=None):
     '''Get the latest checkpoint from the specified checkpoint store
