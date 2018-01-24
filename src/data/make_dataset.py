@@ -24,12 +24,7 @@ meetup_endpoint_for = {
     'locations': 'https://api.meetup.com/find/locations?&sign=true&photo-host=public&lon={lon}&lat={lat}&only={fields}&key={key}'
 }
 
-def _add_location_information(event_ls, lat, lon):
-    for event in event_ls:
-        event['latitude'], event['longitude'] = lat, lon
-    return event_ls
-
-def build_meetup_locations_df(path_to_dest, start_coords, end_coords, coords_step, prop_dict, save_freq=None, use_checkpoint=False):
+def build_meetup_locations_df(path_to_dest, lon_range, lat_range, prop_dict, save_freq=None, use_checkpoint=False):
     '''Build a dataframe consisting of Meetup locations in US cities.
     
     Since, we are using querying the api using freeform text, the signed url
@@ -53,29 +48,27 @@ def build_meetup_locations_df(path_to_dest, start_coords, end_coords, coords_ste
                     checkpoint or not (default: False)
     '''
     locations_endpoint, counter, num_locs = meetup_endpoint_for['locations'], 0, 0
-    start_lon, start_lat = start_coords
-    end_lon, end_lat = end_coords
-    lon_step, lat_step = coords_step
+    lon_start_idx, lat_start_idx = 0, 0
     field_names = "%2C".join(list(prop_dict.values()))
+    path_to_chkpnt_dir = path_to['checkpoints'].format(node='locations')
 
     #  load target dataframe from a checkpoint if specified
     if use_checkpoint:
-        scraping_stats, chkpnt_path = get_chkpnt(path_to['raw']['chkpnts']['locations'])
+        scraping_stats, chkpnt_path = get_chkpnt(path_to_chkpnt_dir, None)
         start_lon, start_lat, num_locs = scraping_stats
+        lon_start_idx, lat_start_idx = lon_range.index(start_lon), lat_range.index(start_lat) 
         meetup_locations_df = pd.read_csv(chkpnt_path, encoding='latin1')
     else:
         meetup_locations_df = pd.DataFrame(columns=prop_dict.keys())
 
     print('\nBuilding meetup locations dataframe. Please wait..')
-    for lon in range(start_lon, end_lon, lon_step): 
-        for lat in range(start_lat, end_lat, lat_step):
-
+    for lon in islice(lon_range, lon_start_idx, None):
+        for lat in islice(lat_range, lat_start_idx, None):
             #  not sure why this needs to be done, but raises an exception
             #  when not put in a try except block
             try:
                 locations_url = locations_endpoint.format(lat=lat, lon=lon, \
-                                    fields=field_names, key=os.environ['API_KEY'])
-
+                                fields=field_names, key=os.environ['API_KEY'])
             except UnicodeEncodeError:
                 pass
 
@@ -86,7 +79,6 @@ def build_meetup_locations_df(path_to_dest, start_coords, end_coords, coords_ste
             if len(locations) > 0:
 
                 for location in locations:
-
                     #  skip locations if not in USA
                     if location['localized_country_name'] != 'USA':
                         continue
@@ -101,7 +93,8 @@ def build_meetup_locations_df(path_to_dest, start_coords, end_coords, coords_ste
             #  checkpoint at regular intervals if interval is specified
             if save_freq is not None and ( counter % save_freq ) == 0:
                 print('\nMaking checkpoint: Found {num_loc} locations\n'.format(num_loc=num_locs))
-                chkpnt_path = path_to['meetup_locations_chkpnt'].format(num_loc=num_locs, lat=lat, lon=lon)
+                chkpnt_fname = "meetup_locations_{}_{}_{}.csv".format(num_locs, lat, lon)
+                chkpnt_path = os.path.join(path_to_chkpnt_dir, chkpnt_fname)
                 meetup_locations_df.to_csv(chkpnt_path, index=False, encoding='latin1')
 
     print('\nBuilding Meetup locations dataframe complete! Dumping event data to {}\n'.format(path_to_dest))
@@ -277,8 +270,9 @@ if __name__ == '__main__':
 
     #  check which api endpoint to scrape
     if args.endpoint == 'locations':
-        build_meetup_locations_df(path_to['meetup_locations'], (-125, 24), (-67, 49), (1,1),
-                                props_for[args.endpoint], args.chkpnt_freq, args.resume)
+        build_meetup_locations_df(path_to['meetup_locations'], range(-125, -67, 1), 
+                                    range(24, 49, 1), props_for[args.endpoint], 
+                                    args.chkpnt_freq, args.resume)
 
     elif args.endpoint == 'events':
         #  dependency: check if the locations dataset exists
