@@ -141,7 +141,6 @@ def build_meetup_events_data(paths, query_type, fields, subfields, save_freq=Non
     print('\nBuilding meetup location - meetup event bridge. Please wait..')
     #  start iterating over dataframe from last stopping point
     for index, row in islice(meetup_locations_df.iterrows(), start_idx, None):
-
         #  pull the meetup location coordinates, query for events around those 
         #  coordinates, and store interesting properties from the response
         loc_lat, loc_lng = row['Latitude'], row['Longitude']
@@ -151,7 +150,6 @@ def build_meetup_events_data(paths, query_type, fields, subfields, save_freq=Non
                         api_key=os.environ['API_KEY'])
         events_data = fetch_paginated_data(events_url, None)
         num_locs += 1
-
         print('Fetched events for {} locations'.format(num_locs), end='\r',)
 
         #  skip adding to the dataframe if request returned no data in response
@@ -165,10 +163,10 @@ def build_meetup_events_data(paths, query_type, fields, subfields, save_freq=Non
             chkpnt_fname_template = "meetup_events_{loc_idx}_{num_events}_{num_locs}.csv"
             chkpnt_fname = chkpnt_fname_template.format(index, num_events, num_locs)
             chkpnt_path = os.path.join(path_to_chkpnt_dir, chkpnt_fname)
-            _save_dataframe(chkpnt_path, df_batches)
+            _save_dataframe(chkpnt_path, df_batches, None)
         
     print('\nBuilding meetup location - meetup event bridge complete! Dumping event data to {}\n'.format(path_to_dest))
-    _save_dataframe(path_to_dest, df_batches)
+    _save_dataframe(path_to_dest, df_batches, None)
 
 def build_meetup_groups_data(paths, fields, optionals, save_freq=None, use_checkpoint=False):
     '''Build a mapping between meetup locations and the groups formed around it.
@@ -271,10 +269,11 @@ if __name__ == '__main__':
     elif args.endpoint == 'events':
         if args.batch is None:
             path_to_source = path_to['meetup_locations']
-            path_to_dest = path_to['meetup_events'].format(query=args.query)
+            path_to_dest = path_to['meetup_events'].format(node=args.endpoint, query=args.query)
         else:
             path_to_source = path_to['meetup_locations_batch'].format(args.batch)
-            path_to_dest = path_to['meetup_events_batch'].format(args.batch, query=args.query)
+            path_to_dest = path_to['meetup_events_batch'].format(args.batch, 
+                                        node=args.endpoint, query=args.query)
         _assert_paths(path_to_source, path_to_dest)
 
         paths['src'], paths['dest'] = path_to_source, path_to_dest
