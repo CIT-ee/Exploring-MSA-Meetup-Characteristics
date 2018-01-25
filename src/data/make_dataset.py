@@ -37,12 +37,12 @@ def _assert_paths(path_to_source, path_to_dest):
     assert os.path.exists(os.path.dirname(path_to_dest)), \
         'Please create directory at {} first!'.format(os.path.dirname(path_to_dest))
 
-def _save_dataframe(path_to_dest, df_batches, index='id'):
+def _save_dataframe(path_to_dest, df_batches, index):
     dest_df = pd.concat(df_batches).reset_index(drop=True)
     dest_df.drop_duplicates(subset=index, inplace=True)
     dest_df.to_csv(path_to_dest, encoding='latin1', index=False)
 
-def build_meetup_locations_df(path_to_dest, lon_range, lat_range, prop_dict, save_freq=None, use_checkpoint=False, path_to_chkpnt_dir):
+def build_meetup_locations_df(paths, lon_range, lat_range, prop_dict, save_freq=None, use_checkpoint=False):
     '''Build a dataframe consisting of Meetup locations in US cities.
     
     Since, we are using querying the api using freeform text, the signed url
@@ -64,6 +64,7 @@ def build_meetup_locations_df(path_to_dest, lon_range, lat_range, prop_dict, sav
     use_checkpoint -- flag indicating whether to resume from a previous
                     checkpoint or not (default: False)
     '''
+    path_to_chkpnt_dir, path_to_dest = paths.values()
     df_batches, locations_endpoint = [], meetup_endpoint_for['locations']
     counter, num_locs, lon_start_idx, lat_start_idx = 0, 0, 0, 0
     field_names = "%2C".join(list(prop_dict.values()))
@@ -73,8 +74,7 @@ def build_meetup_locations_df(path_to_dest, lon_range, lat_range, prop_dict, sav
         scraping_stats, chkpnt_path = get_chkpnt(path_to_chkpnt_dir, None)
         start_lon, start_lat, num_locs = scraping_stats
         lon_start_idx, lat_start_idx = lon_range.index(start_lon), lat_range.index(start_lat) 
-        meetup_locations_df = pd.read_csv(chkpnt_path, encoding='latin1')
-        df_batches.append(meetup_locations_df)
+        df.append(pd.read_csv(chkpnt_path, encoding='latin1'))
 
     print('\nBuilding meetup locations dataframe. Please wait..')
     for lon in islice(lon_range, lon_start_idx, None):
@@ -96,7 +96,7 @@ def build_meetup_locations_df(path_to_dest, lon_range, lat_range, prop_dict, sav
             #  skip adding to the dataframe if request returned no data in response
             if len(locations) == 0: continue
 
-            filtered_locs = list(filter(lambda x: x['localized_country_name'] == 'USA'), locations)
+            filtered_locs = list(filter(lambda x: x['localized_country_name'] == 'USA', locations))
             df_batches.append(pd.DataFrame(filtered_locs))
             num_locs += df_batches[-1].shape[0]
 
@@ -105,12 +105,12 @@ def build_meetup_locations_df(path_to_dest, lon_range, lat_range, prop_dict, sav
                 print('\nMaking checkpoint: Found {num_loc} locations\n'.format(num_loc=num_locs))
                 chkpnt_fname = "meetup_locations_{}_{}_{}.csv".format(num_locs, lat, lon)
                 chkpnt_path = os.path.join(path_to_chkpnt_dir, chkpnt_fname)
-                _save_dataframe(chkpnt_path, df_batches)
+                _save_dataframe(chkpnt_path, df_batches, None)
 
     print('\nBuilding Meetup locations dataframe complete! Dumping event data to {}\n'.format(path_to_dest))
-    _save_dataframe(path_to_dest, df_batches)
+    _save_dataframe(path_to_dest, df_batches, None)
 
-def build_meetup_events_data(path_to_src, path_to_dest, query_type, fields, subfields, save_freq=None, use_checkpoint=False, path_to_chkpnt_dir):
+def build_meetup_events_data(paths, query_type, fields, subfields, save_freq=None, use_checkpoint=False):
     '''Build a mapping between meetup locations and the events happening in it.
 
     Even after using request throttling to stay within the API's request rate 
@@ -127,6 +127,7 @@ def build_meetup_events_data(path_to_src, path_to_dest, query_type, fields, subf
                 checkpoint (default: None)
     use_checkpoint -- flag indicating whether to resume from a previous
     '''
+    path_to_source, path_to_dest, path_to_chkpnt_dir = paths.values()
     meetup_locations_df = pd.read_csv(path_to_src, encoding='latin1')
     events_endpoint, df_batches = meetup_endpoint_for['events'][query_type], []
     num_events, num_locs, start_idx = 0, 0, 0
@@ -135,8 +136,7 @@ def build_meetup_events_data(path_to_src, path_to_dest, query_type, fields, subf
     if use_checkpoint:
         scraping_stats, chkpnt_path = get_chkpnt(path_to_chkpnt_dir, query_type)
         start_idx, num_events, num_locs = scraping_stats
-        meetup_events_df = pd.read_csv(chkpnt_path, encoding='latin1')
-        df_batches.append(meetup_events_df)
+        df_batches.append(pd.read_csv(chkpnt_path, encoding='latin1'))
 
     print('\nBuilding meetup location - meetup event bridge. Please wait..')
     #  start iterating over dataframe from last stopping point
@@ -170,7 +170,7 @@ def build_meetup_events_data(path_to_src, path_to_dest, query_type, fields, subf
     print('\nBuilding meetup location - meetup event bridge complete! Dumping event data to {}\n'.format(path_to_dest))
     _save_dataframe(path_to_dest, df_batches)
 
-def build_meetup_groups_data(path_to_src, path_to_dest, fields, optionals, save_freq=None, use_checkpoint=False):
+def build_meetup_groups_data(paths, fields, optionals, save_freq=None, use_checkpoint=False):
     '''Build a mapping between meetup locations and the groups formed around it.
 
     Even after using request throttling to stay within the API's request rate 
@@ -186,6 +186,7 @@ def build_meetup_groups_data(path_to_src, path_to_dest, fields, optionals, save_
                 checkpoint (default: None)
     use_checkpoint -- flag indicating whether to resume from a previous
     '''
+    path_to_source, path_to_dest, path_to_chkpnt_dir = paths.values()
     meetup_locations_df = pd.read_csv(path_to_src, encoding='latin1')
     groups_endpoint = meetup_endpoint_for['groups']
     groups_batches, num_groups, num_locs, start_idx = [], 0, 0, 0
@@ -250,7 +251,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    path_to_chkpnt_dir = path_to['chkpnts'].format(node=args.endpoint)
+    paths = { 'chkpnt': path_to['chkpnts'].format(node=args.endpoint) }
 
     #  check if there is a checkpoint store to resume from 
     if args.resume:
@@ -263,9 +264,9 @@ if __name__ == '__main__':
     
     #  check which api endpoint to scrape
     if args.endpoint == 'locations':
-        build_meetup_locations_df(path_to['meetup_locations'], range(-125, -67, 1), 
-                                    range(24, 49, 1), props_for[args.endpoint], 
-                                    args.chkpnt_freq, args.resume, path_to_chkpnt_dir)
+        paths['dest'] = path_to['meetup_locations']
+        build_meetup_locations_df(paths, range(-125, -67, 1), range(24, 49, 1), 
+                                props_for[args.endpoint], args.chkpnt_freq, args.resume)
 
     elif args.endpoint == 'events':
         if args.batch is None:
@@ -273,14 +274,14 @@ if __name__ == '__main__':
             path_to_dest = path_to['meetup_events'].format(query=args.query)
         else:
             path_to_source = path_to['meetup_locations_batch'].format(args.batch)
-            path_to_dest = path_to['meetup_events_batch'].format(query=args.query, args.batch)
+            path_to_dest = path_to['meetup_events_batch'].format(args.batch, query=args.query)
         _assert_paths(path_to_source, path_to_dest)
 
+        paths['src'], paths['dest'] = path_to_source, path_to_dest
         props_for_query = props_for[args.endpoint][args.query]
 
-        build_meetup_events_data(path_to_source, path_to_dest, args.query, 
-                                props_for_query['only'], props_for_query['fields'],
-                                args.chkpnt_freq, args.resume, path_to_chkpnt_dir)
+        build_meetup_events_data(paths, args.query, props_for_query['only'], 
+                                props_for_query['fields'], args.chkpnt_freq, args.resume)
     
     elif args.endpoint == 'groups':
         #  dependency: check if the locations dataset exists
@@ -294,7 +295,8 @@ if __name__ == '__main__':
         assert os.path.exists(path_to_dest_dir), \
             'Destination directory does not exist at {}. Please build that first!'.format(path_to_dest_dir)
 
+        paths['src'], paths['dest'] = path_to_source, path_to_dest
         props_for_query = props_for[args.endpoint]
 
-        build_meetup_groups_data(path_to_locs, path_to_dest, props_for_query['only'], 
-                                props_for_query['fields'], args.chkpnt_freq, args.resume)
+        build_meetup_groups_data(paths, props_for_query['only'], props_for_query['fields'], 
+                                args.chkpnt_freq, args.resume)
