@@ -127,8 +127,8 @@ def build_meetup_events_data(paths, query_type, fields, subfields, save_freq=Non
                 checkpoint (default: None)
     use_checkpoint -- flag indicating whether to resume from a previous
     '''
-    path_to_source, path_to_dest, path_to_chkpnt_dir = paths.values()
-    meetup_locations_df = pd.read_csv(path_to_src, encoding='latin1')
+    path_to_chkpnt_dir, path_to_source, path_to_dest = paths.values()
+    meetup_locations_df = pd.read_csv(path_to_source, encoding='latin1')
     events_endpoint, df_batches = meetup_endpoint_for['events'][query_type], []
     num_events, num_locs, start_idx = 0, 0, 0
 
@@ -186,8 +186,8 @@ def build_meetup_groups_data(paths, fields, optionals, save_freq=None, use_check
                 checkpoint (default: None)
     use_checkpoint -- flag indicating whether to resume from a previous
     '''
-    path_to_source, path_to_dest, path_to_chkpnt_dir = paths.values()
-    meetup_locations_df = pd.read_csv(path_to_src, encoding='latin1')
+    path_to_chkpnt_dir, path_to_source, path_to_dest = paths.values()
+    meetup_locations_df = pd.read_csv(path_to_source, encoding='latin1')
     groups_endpoint = meetup_endpoint_for['groups']
     groups_batches, num_groups, num_locs, start_idx = [], 0, 0, 0
     nrows, _ = meetup_locations_df.shape
