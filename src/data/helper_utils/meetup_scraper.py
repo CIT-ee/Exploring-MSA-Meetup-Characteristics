@@ -49,12 +49,15 @@ def _flatten_dict(d, delimiter=':'):
                 (delimiter.join([key, k]), v)
                 for k, v in _flatten_dict(value, delimiter).items()
             ]
+        elif isinstance(value, list):
+            return [(
+                delimiter.join([ key, value[0].keys()[0] ]), \
+                tuple([ v for d in value for k, v in d.items()])
+            )]
         else:
             return [(key, value)]
-    
-    return dict(
-        [item for k, v in d.items() for item in _expand_key_value(k, v)]
-    )
+    ls = [item for k, v in d.items() for item in _expand_key_value(k, v)]
+    return dict(ls)
 
 def _convert_dict_list_to_list(data):
     #  hack to turn list of objects to just list
