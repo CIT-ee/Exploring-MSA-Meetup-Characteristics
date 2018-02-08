@@ -1,6 +1,6 @@
 from __future__ import print_function
 import sys, os, json, argparse, pandas as pd, geocoder, pdb, requests.packages.urllib3 as urllib3
-from itertools import islice
+from itertools import product, islice
 
 sys.path.insert(0, os.environ['PROJECT_PATH']) # point python interpreter to top of project dir 
 
@@ -169,7 +169,7 @@ def build_meetup_events_data(paths, query_type, fields, subfields, save_freq=Non
     print('\nBuilding meetup location - meetup event bridge complete! Dumping event data to {}\n'.format(path_to_dest))
     _save_dataframe(path_to_dest, df_batches, None)
 
-def build_meetup_groups_data(paths, lon_range, lat_range, prop_dict, save_freq=None, use_checkpoint=False):
+def build_meetup_groups_data(paths, coord_ls, prop_dict, save_freq=None, use_checkpoint=False):
     '''Build a mapping between meetup locations and the groups formed around it.
 
     Even after using request throttling to stay within the API's request rate 
@@ -188,44 +188,42 @@ def build_meetup_groups_data(paths, lon_range, lat_range, prop_dict, save_freq=N
     fields, optionals = prop_dict['only'], prop_dict['fields']
     path_to_chkpnt_dir, path_to_dest = paths.values()
     groups_endpoint = meetup_endpoint_for['groups']
-    df_batches, num_locs, num_groups, lon_start_idx, lat_start_idx = [], 0, 0, 0, 0
-    chkpnt_fname_template = "meetup_groups_{}_{}_{}_{}.csv"
+    df_batches, num_groups, coord_start_idx = [], 0, 0
+    chkpnt_fname_template = "meetup_groups_{}_{}.csv"
 
     #  load target data store from a checkpoint if specified
     if use_checkpoint:
-        scraping_stats, chkpnt_path = get_chkpnt(path_to['raw']['chkpnts']['groups'], None)
-        start_lon, start_lat, num_locs, num_groups = scraping_stats
-        lon_start_idx, lat_start_idx = lon_range.index(start_lon), lat_range.index(start_lat) 
+        scraping_stats, chkpnt_path = get_chkpnt(path_to_chkpnt_dir, None)
+        coord_start_idx, num_groups = scraping_stats
         df_batches.append(pd.read_csv(chkpnt_path, encoding='latin1'))
 
     print('\nBuilding meetup location - meetup groups bridge. Please wait..')
     #  start iterating over geoloc coordinates from last stopping point
-    for lon in islice(lon_range, lon_start_idx, None):
-        for lat in islice(lat_range, lat_start_idx, None):
-            #  pull the meetup location coordinates, query for groups around those 
-            #  coordinates, and store interesting properties from the response
-            field_names, optionals_names = ",".join(fields), ",".join(optionals)
-            groups_url = groups_endpoint.format(lat=lat, lon=lon, \
-                            fields=field_names, optionals=optionals_names, \
-                            api_key=os.environ['API_KEY'])
-            groups_data = fetch_paginated_data(groups_url, None)
-            num_locs += 1
-
-            #  skip adding to the dataframe if request returned no data in response
-            if len(groups_data) == 0: continue
-            
-            df_batches.append(get_df_from_nested_dicts(groups_data)) 
-            num_groups += df_batches[-1].shape[0]
-
-            #  checkpoint at regular intervals if interval is specified
-            if save_freq is not None and ( num_locs % save_freq ) == 0: 
-                print('\nMaking checkpoint: Processed {} locations\n'.format(num_locs))
-                chkpnt_fname = chkpnt_fname_template.format(lon, lat, num_locs, num_groups)
-                chkpnt_path = os.path.join(path_to_chkpnt_dir, chkpnt_fname)
-                _save_dataframe(chkpnt_path, df_batches, None, 'utf-8')
-
-            print('Fetched groups from {} locations'.format(num_locs))
+    for _idx, coord in enumerate(islice(coord_ls, coord_start_idx, None)):
+        #  query for groups around current coordinates 
+        lon, lat = coord
+        field_names, optionals_names = ",".join(fields), ",".join(optionals)
+        groups_url = groups_endpoint.format(lat=lat, lon=lon, \
+                        fields=field_names, optionals=optionals_names, \
+                        api_key=os.environ['API_KEY'])
+        groups_data = fetch_paginated_data(groups_url, None)
+        num_locs = coord_start_idx + _idx + 1
+    
+        #  skip adding to the dataframe if request returned no data in response
+        if len(groups_data) == 0: continue
         
+        df_batches.append(get_df_from_nested_dicts(groups_data)) 
+        num_groups += df_batches[-1].shape[0]
+
+        #  checkpoint at regular intervals if interval is specified
+        if save_freq is not None and ( num_locs % save_freq ) == 0: 
+            print('\nMaking checkpoint: Processed {} locations\n'.format(num_locs))
+            chkpnt_fname = chkpnt_fname_template.format(num_locs, num_groups)
+            chkpnt_path = os.path.join(path_to_chkpnt_dir, chkpnt_fname)
+            _save_dataframe(chkpnt_path, df_batches, None, 'utf-8')
+
+        print('Fetched groups from {} locations'.format(num_locs))
+    
     print('\nBuilding meetup location - meetup groups bridge complete! Dumping groups data to {}\n'.format(path_to_dest))
     _save_dataframe(path_to_dest, df_batches, None, 'utf-8')
 
@@ -274,14 +272,14 @@ if __name__ == '__main__':
                                 props_for_query['fields'], args.chkpnt_freq, args.resume)
     
     elif args.endpoint == 'groups':
-        lon_range, lat_range = range(-125, -67, 1), range(24, 49, 1)
+        geo_coords = list(product(range(-125, -67, 1), range(24, 49, 1)))
 
         if args.batch is None:
             path_to_dest = path_to['meetup_groups']
         else:
-            start_idx, stop_idx = args.batch*10, (args.batch + 1)*10
-            lon_range, lat_range = lon_range[ start_idx:stop_idx ], \
-                                    lat_range[ start_idx:stop_idx ] 
+            start_idx, stop_idx = args.batch * 5, (args.batch + 1) * 5
+            coord_ls = geo_coords[start_idx:] if stop_idx >= len(geo_coords) \
+                        else geo_coords[start_idx:stop_idx]
             path_to_dest = path_to['meetup_groups_batch'].format(args.batch)
 
         path_to_dest_dir = os.path.dirname(path_to_dest)
@@ -289,5 +287,5 @@ if __name__ == '__main__':
             'Destination directory does not exist at {}. Please build that first!'.format(path_to_dest_dir)
 
         paths['dest'] = path_to_dest
-        build_meetup_groups_data(paths, lon_range, lat_range, props_for[args.endpoint], 
+        build_meetup_groups_data(paths, coord_ls, props_for[args.endpoint], 
                                 args.chkpnt_freq, args.resume)
