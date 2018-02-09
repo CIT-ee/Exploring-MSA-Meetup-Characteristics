@@ -12,5 +12,7 @@ This directory houses scripts related to creating and validating the data source
     * To specify a subcategory of data to scrape from the same endpoint, run `python src/data/make_dataset.py --query <query_name>`
     * To enable checkpointing, run `python src/data/make_dataset.py --chkpnt_freq <chkpnt_freq_num>`. This will write the scraped data to disk after every *checkpnt_freq_num* iterations
     * To resume from a previous checkpoint, run `python src/data/make_dataset.py --resume <resume_bool>`
-    
+
+* `wrangle_data.py`: This script has general purpose methods to manipulate existing data sources like break datasets into batches, consolidate batches into a master dataset and add MSA data to an existing dataset.
+
 * `validate_dataset.py`: **TODO**
