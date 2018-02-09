@@ -1,5 +1,5 @@
 from __future__ import print_function
-import sys, os, json, argparse, pandas as pd, geocoder, pdb, requests.packages.urllib3 as urllib3
+import sys, os, argparse, pandas as pd, requests.packages.urllib3 as urllib3, pdb
 from itertools import product, islice
 
 sys.path.insert(0, os.environ['PROJECT_PATH']) # point python interpreter to top of project dir 
@@ -12,7 +12,6 @@ urllib3.disable_warnings(urllib3.exceptions.InsecurePlatformWarning)
 from config.resources import path_to
 from config.api_specs import props_for
 from src.data.utils import assert_paths, save_dataframe
-from src.data.helper_scripts.msa_data_builder import get_mean_coords
 from src.data.helper_scripts.meetup_scraper import ( fetch_paginated_data, 
                                                 get_df_from_nested_dicts, get_chkpnt )
 
@@ -24,7 +23,6 @@ meetup_endpoint_for = {
     'groups': 'https://api.meetup.com/find/groups?&sign=true&photo-host=public&lon={lon}&fields={optionals}&lat={lat}&page=20&only={fields}&key={api_key}',
     'locations': 'https://api.meetup.com/find/locations?&sign=true&photo-host=public&lon={lon}&lat={lat}&only={fields}&key={key}'
 }
-
 
 def build_meetup_locations_df(paths, lon_range, lat_range, prop_dict, save_freq=None, use_checkpoint=False):
     '''Build a dataframe consisting of Meetup locations in US cities.
@@ -103,7 +101,7 @@ def build_meetup_events_data(paths, query_type, fields, subfields, save_freq=Non
     
     Keyword arguments:
     path_to_src -- path to csv file with MSA name and coordinates (default None)
-    path_to_dest -- path to json file with the mapping between MSA and events (default None)
+    path_to_dest -- path to csv file with the mapping between MSA and events (default None)
     query_type -- type of data to query from the endpoint
     fields -- fields to filter the request with (default: None)
     subfields -- subfields to filter the requests with (default: None)
