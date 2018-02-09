@@ -1,6 +1,7 @@
 # ignore environment and configuration 
 # related files/folders
 .env
+config/
 
 # ignore ipython nb checkpoints
 .ipynb_checkpoints
