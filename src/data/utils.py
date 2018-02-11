@@ -1,5 +1,10 @@
 import os, pandas as pd
 
+def merge_dicts(d1, d2):
+    interim = d1.copy()
+    interim.update(d2)
+    return interim
+
 def assert_paths(path_to_source, path_to_dest):
     '''Assert the paths provided are valid
             

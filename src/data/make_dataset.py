@@ -11,7 +11,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecurePlatformWarning)
 #  import local modules
 from config.resources import path_to
 from config.api_specs import props_for
-from src.data.utils import assert_paths, save_dataframe
+from src.data.utils import merge_dicts, assert_paths, save_dataframe
 from src.data.helper_scripts.meetup_scraper import ( fetch_paginated_data, 
                                                 get_df_from_nested_dicts, get_chkpnt )
 
@@ -126,9 +126,9 @@ def build_meetup_events_data(paths, query_type, fields, subfields, save_freq=Non
     for index, row in islice(meetup_locations_df.iterrows(), start_idx, None):
         #  pull the meetup location coordinates, query for events around those 
         #  coordinates, and store interesting properties from the response
-        loc_lat, loc_lng = row['Latitude'], row['Longitude']
+        loc_lat, loc_lon = row['Latitude'], row['Longitude']
         field_names, subfield_name = ",".join(fields), ",".join(subfields)
-        events_url = events_endpoint.format(lat=loc_lat, lon=loc_lng, \
+        events_url = events_endpoint.format(lat=loc_lat, lon=loc_lon, \
                         fields=field_names, optional_fields=subfield_name, \
                         api_key=os.environ['API_KEY'])
         events_data = fetch_paginated_data(events_url, None)
@@ -138,6 +138,10 @@ def build_meetup_events_data(paths, query_type, fields, subfields, save_freq=Non
         #  skip adding to the dataframe if request returned no data in response
         if len(events_data) == 0: continue
         
+        #  add location data explicitly
+        events_data = list(map(lambda d: merge_dicts(d, { 'lat': loc_lat, 'loc': loc_lon }), events_data))
+
+        #  flatten the dicts and convert the batch of event data to dataframe
         df_batches.append(get_df_from_nested_dicts(events_data))
         num_events += df_batches[-1].shape[0]
 
@@ -243,8 +247,8 @@ if __name__ == '__main__':
             path_to_dest = path_to['scraped_endpoint'].format(endpoint=args.endpoint, query=args.query)
         else:
             path_to_source = path_to['meetup_locations_batch'].format(args.batch)
-            path_to_dest = path_to['scraped_batch'].format(args.batch, 
-                            endpoint=args.endpoint, query=args.query)
+            path_to_dest = path_to['scraped_batch'].format(endpoint=args.endpoint,
+                                                    query=args.query, idx=args.batch)
 
         assert_paths(path_to_source, path_to_dest)
 
