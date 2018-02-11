@@ -19,7 +19,7 @@ This directory houses scripts related to creating and validating the data source
        --resume=BOOLEAN    flag: resume from checkpoint or not
    ```
     
-* `wrangle_data.py`: This script has general purpose methods to manipulate existing data sources like break datasets into batches, consolidate batches into a master dataset and add MSA data to an existing dataset.
+* `wrangle_dataset.py`: This script has general purpose methods to manipulate existing data sources like break datasets into batches, consolidate batches into a master dataset and add MSA data to an existing dataset.
 
    ```
    python src/data/make_dataset.py [OPTIONS]

@@ -99,14 +99,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.op == 'batchify':
-        pass
+        pass # TODO
 
     elif args.op == 'stitchify':
         assert args.endpoint is not None, 'Please choose endpoint to operate on first!'
 
-        path_to_src_dir = os.path.dirname(path_to['scraped_batch'])
+        source_key = input('Please enter source keyword: ')
+        dest_key = input('Please enter destination keyword: ')
+
+        path_to_src_dir = os.path.dirname(path_to[source_key])
         path_to_source = path_to_src_dir.format(endpoint=args.endpoint, query=args.query)
-        path_to_dest = path_to['scraped_endpoint'].format(endpoint=args.endpoint, query=args.query)
+        path_to_dest = path_to[dest_key].format(endpoint=args.endpoint, query=args.query)
 
         _assert_paths(path_to_source, path_to_dest)
 
