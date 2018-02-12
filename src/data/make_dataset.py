@@ -139,7 +139,7 @@ def build_meetup_events_data(paths, query_type, fields, subfields, save_freq=Non
         if len(events_data) == 0: continue
         
         #  add location data explicitly
-        events_data = list(map(lambda d: merge_dicts(d, { 'lat': loc_lat, 'loc': loc_lon }), events_data))
+        events_data = list(map(lambda d: merge_dicts(d, { 'lat': loc_lat, 'lon': loc_lon }), events_data))
 
         #  flatten the dicts and convert the batch of event data to dataframe
         df_batches.append(get_df_from_nested_dicts(events_data))

@@ -104,8 +104,8 @@ if __name__ == '__main__':
     elif args.op == 'stitchify':
         assert args.endpoint is not None, 'Please choose endpoint to operate on first!'
 
-        source_key = input('Please enter source keyword: ')
-        dest_key = input('Please enter destination keyword: ')
+        source_key = raw_input('Please enter source keyword: ')
+        dest_key = raw_input('Please enter destination keyword: ')
 
         path_to_src_dir = os.path.dirname(path_to[source_key])
         path_to_source = path_to_src_dir.format(endpoint=args.endpoint, query=args.query)
@@ -128,9 +128,4 @@ if __name__ == '__main__':
 
         _assert_paths(path_to_source, path_to_dest)
 
-        dest_loc_fields = [ 'MSA_NAME', 'MSA_CODE'  ]
-        if args.endpoint == 'groups':
-            src_loc_fields = [ 'lat', 'lon'  ]
-            data_format = 'lat-lon'
-
-        add_msa_data(path_to_source, path_to_dest, src_loc_fields, dest_loc_fields, data_format)
+        add_msa_data(path_to_source, path_to_dest, [ 'lon', 'lat' ], [ 'MSA_NAME', 'MSA_CODE' ], 'lat-lon' )
