@@ -8,9 +8,9 @@ props_for = {
         'Longitude': 'lon'
     },
     'groups': {
-        'only': [ 'id', 'name', 'status', 'link', 'created', 'lat', 'lon', 'who', 
-                'category.name', 'members', 'past_event_count', 'topics.urlkey' ],
-        'fields': [ 'past_event_count', 'topics' ]
+        'only': [ 'id', 'plain_text_description', 'next_event.yes_rsvp_count',
+                    'last_event.yes_rsvp_count' ],
+        'fields': [ 'plain_text_description', 'last_event' ]
     },
     'events':{
         'topics': {
