@@ -188,6 +188,7 @@ def build_meetup_groups_data(paths, coord_ls, prop_dict, save_freq=None, use_che
     for _idx, coord in enumerate(islice(coord_ls, coord_start_idx, None)):
         #  query for groups around current coordinates 
         lon, lat = coord
+        print('Processing location - lon: {}, lat: {}'.format(lon, lat))
         field_names, optionals_names = ",".join(fields), ",".join(optionals)
         groups_url = groups_endpoint.format(lat=lat, lon=lon, \
                         fields=field_names, optionals=optionals_names, \
