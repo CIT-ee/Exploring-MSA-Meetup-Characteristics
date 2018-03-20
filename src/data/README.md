@@ -1,6 +1,6 @@
 ## Overview
 
-This directory houses scripts related to creating and validating the data sources associated with this project - *make_dataset.py* and *validate_dataset.py*
+This directory houses scripts related to creating and validating the data sources associated with this project - *make_dataset.py* and *wrangle_dataset.py*
 
 **NOTE:** These scripts require a environment variable called *PROJECT_PATH* which you can set by running the following command - `export PROJECT_PATH=<path to project dir>`
 
