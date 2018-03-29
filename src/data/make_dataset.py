@@ -20,7 +20,7 @@ meetup_endpoint_for = {
         'topics': 'https://api.meetup.com/find/events?&sign=true&photo-host=public&lon={lon}&radius=0&fields={optional_fields}&lat={lat}&only={fields}&key={api_key}',
         'attendance': 'https://api.meetup.com/find/events?&sign=true&photo-host=public&lon={lon}&radius=0&fields={optional_fields}&lat={lat}&only={fields}&key={api_key}'
     },
-    'groups': 'https://api.meetup.com/find/groups?&sign=true&photo-host=public&lon={lon}&fields={optionals}&lat={lat}&page=20&only={fields}&key={api_key}',
+    'groups': 'https://api.meetup.com/find/groups?&sign=true&photo-host=public&lon={lon}&radius=69&fields={optionals}&lat={lat}&order=distance&page=20&only={fields}&key={api_key}',
     'locations': 'https://api.meetup.com/find/locations?&sign=true&photo-host=public&lon={lon}&lat={lat}&only={fields}&key={key}'
 }
 
@@ -260,7 +260,7 @@ if __name__ == '__main__':
                                 props_for_query['fields'], args.chkpnt_freq, args.resume)
     
     elif args.endpoint == 'groups':
-        geo_coords = list(product(range(-125, -67, 1), range(24, 49, 1)))
+        geo_coords = list(product(range(-125, -67, 1), range(26, 49, 1)))
 
         if args.batch is None:
             path_to_dest = path_to['scraped_endpoint'].format(endpoint=args.endpoint, query=args.query)
