@@ -31,9 +31,15 @@ def _make_api_call(url):
     sleep(pause_time) 
 
     if res.status_code >= 400:
-        print('URL in question: ', url)
-        print(res.json())
-        pdb.set_trace() #  TODO: deal with request errors
+        if res.status_code == 429:
+            pause_time = float(res.headers['X-Ratelimit-Reset'])
+            print('Credentials throttled. Retrying after {} seconds..'.format(pause_time))
+            sleep(pause_time)
+            return _make_api_call(url)
+        else:
+            print('URL in question: ', url)
+            print(res.json())
+            pdb.set_trace() #  TODO: deal with request errors
         
     # make sure the server responded with OK status
     elif res.status_code == requests.codes.ok:
@@ -50,10 +56,13 @@ def _flatten_dict(d, delimiter=':'):
                 for k, v in _flatten_dict(value, delimiter).items()
             ]
         elif isinstance(value, list):
-            return [(
-                delimiter.join([ key, value[0].keys()[0] ]), \
-                tuple([ v for d in value for k, v in d.items()])
-            )]
+            if len(value) > 0:
+                return [(
+                    delimiter.join([ key, value[0].keys()[0] ]), \
+                    tuple([ v for d in value for k, v in d.items()])
+                )]
+            else:
+                return [('topics.urlkey', None)]
         else:
             return [(key, value)]
     ls = [item for k, v in d.items() for item in _expand_key_value(k, v)]
