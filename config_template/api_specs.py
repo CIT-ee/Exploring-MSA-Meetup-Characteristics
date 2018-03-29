@@ -10,7 +10,8 @@ props_for = {
     'groups': {
         'only': [ 'id', 'category.name', 'created', 'lat', 'link', 'lon', 'members', \
                 'name', 'past_event_count', 'status', 'topics.urlkey', 'who', \
-                'next_event.yes_rsvp_count', 'last_event.yes_rsvp_count', 'plain_text_description' ],
+                'next_event.yes_rsvp_count', 'last_event.yes_rsvp_count', \
+                'plain_text_description', 'city', 'country' ],
         'fields': [ 'last_event', 'topics', 'plain_text_description', 'past_event_count' ]
     },
     'events':{

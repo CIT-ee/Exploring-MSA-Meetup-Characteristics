@@ -56,7 +56,8 @@ def stitch_batch_data(path_to_source, path_to_dest, encoding='latin1'):
     src_paths = [ os.path.join(path_to_source, fname) for fname in os.listdir(path_to_source) ]
     df_batches = []
     print('\nPreparing to stitchify the dataframe. Please wait ..')
-    for path in src_paths:
+    for _idx, path in enumerate(src_paths):
+        print('Processed {} batches..'.format(_idx))
         df_batches.append(pd.read_csv(path, encoding=encoding))
     dest_df = pd.concat(df_batches).drop_duplicates().reset_index(drop=True)
     print('Stitchification of dataframe completed! Dumping data to {}\n'.format(path_to_dest))
