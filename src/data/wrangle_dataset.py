@@ -63,7 +63,7 @@ def stitch_batch_data(path_to_source, path_to_dest, encoding='latin1'):
     print('Stitchification of dataframe completed! Dumping data to {}\n'.format(path_to_dest))
     dest_df.to_csv(path_to_dest, encoding=encoding, index=False)
 
-def add_msa_data(path_to_source, path_to_dest, src_loc_fields, dest_loc_fields, data_format):
+def add_census_data(path_to_source, path_to_dest, src_loc_fields, census_name, data_format):
     '''Gathers MSA data (code and name) for the locations present in the dataframe 
     in question and concatenates the colleced data to the same
 
@@ -74,16 +74,18 @@ def add_msa_data(path_to_source, path_to_dest, src_loc_fields, dest_loc_fields, 
                     MSA data ( default: None  )
     src_loc_fields -- list of fields in the source dataframe to serve as the 
                         geolocation basis for the process ( default: []  )
-    dest_loc_fields -- list of geolocation fields to be added to the dataframe,
-                        usually just the MSA name and code ( default: []  )
+    census_name -- name of the census level interested in ( default: None )
     data_format -- qualifier to be supplied to the msa-mapping module, whether
                     to start from an address or lat-lon pair ( default: address  )
     '''
+    source_fname = os.path.basename(path_to_source)
     source_df = pd.read_csv(path_to_source, encoding='latin1')
-    print('\nPreparing to add MSA data to the data frame in question. Please wait ..')
+    print('\nPreparing to add MSA data to {}. Please wait ..'.format(source_fname))
     src_loc_df = source_df[ src_loc_fields  ]
     msa_mapping_client = MSAMapper(src_loc_df.fillna(''))
-    dest_loc_df = msa_mapping_client.map_data(data_format)
+
+    dest_loc_fields = [ census_name.upper() + '_NAME', census_name.upper() + '_CODE' ]
+    dest_loc_df = msa_mapping_client.map_data(census_name, dest_loc_fields, data_format)
     dest_df = pd.concat([ source_df, dest_loc_df[ dest_loc_fields  ]  ], axis=1)
 
     print('Adding MSA data to dataframe completed! Dumping data to {}'.format(path_to_dest))
@@ -95,6 +97,7 @@ if __name__ == '__main__':
     parser.add_argument('--op', help='operation to perform')
     parser.add_argument('--endpoint', help='meetup endpoint to work on')
     parser.add_argument('--query', default='', help='subset of endpoint data to work on')
+    parser.add_argument('--census_name', default='msa', help='name of census level to work on')
     parser.add_argument('--batch', type=int, help='batch idx to operate on')
 
     args = parser.parse_args()
@@ -116,17 +119,17 @@ if __name__ == '__main__':
 
         stitch_batch_data(path_to_source, path_to_dest, 'utf-8') 
 
-    elif args.op == 'add_msa':
+    elif args.op == 'add_census_data':
         assert args.endpoint is not None, 'Please choose endpoint to operate on first!'
 
         #  set the paths to source and destination
         if args.batch is None:
             path_to_source = path_to['scraped_endpoint'].format(endpoint=args.endpoint, query=args.query)
-            path_to_dest = path_to['with_msa_endpoint'].format(endpoint=args.endpoint, query=args.query)
+            path_to_dest = path_to['with_census_endpoint'].format(endpoint=args.endpoint, query=args.query, census=args.census_name)
         else:
             path_to_source = path_to['scraped_batch'].format(endpoint=args.endpoint, query=args.query, idx=args.batch)
-            path_to_dest = path_to['with_msa_batch'].format(endpoint=args.endpoint, query=args.query, idx=args.batch)
+            path_to_dest = path_to['with_census_batch'].format(endpoint=args.endpoint, query=args.query, idx=args.batch, census=args.census_name)
 
         _assert_paths(path_to_source, path_to_dest)
 
-        add_msa_data(path_to_source, path_to_dest, [ 'lon', 'lat' ], [ 'MSA_NAME', 'MSA_CODE' ], 'lat-lon' )
+        add_census_data(path_to_source, path_to_dest, [ 'lon', 'lat' ], args.census_name, 'lat-lon' )
