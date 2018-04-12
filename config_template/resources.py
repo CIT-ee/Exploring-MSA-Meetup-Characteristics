@@ -11,5 +11,5 @@ path_to = {
     'scraped_endpoint': os.path.join(os.environ['DATA_PATH'], 'raw', '{endpoint}', '{query}', 'meetup_{endpoint}.csv'),
     'scraped_batch': os.path.join(os.environ['DATA_PATH'], 'raw', '{endpoint}', '{query}', 'batches', 'meetup_{endpoint}_{idx}.csv'),
     'with_msa_endpoint': os.path.join(os.environ['DATA_PATH'], 'raw', '{endpoint}', '{query}', 'meetup_{endpoint}_with_msa.csv'),
-    'with_msa_batch': os.path.join(os.environ['DATA_PATH'], 'raw', '{endpoint}', '{query}', 'batches_with_msa', 'meetup_{endpoint}_{idx}_with_msa.csv'),
+    'with_msa_batch': os.path.join(os.environ['DATA_PATH'], 'raw', '{endpoint}', '{query}', 'batches', 'meetup_{endpoint}_{idx}_with_msa.csv'),
 }
