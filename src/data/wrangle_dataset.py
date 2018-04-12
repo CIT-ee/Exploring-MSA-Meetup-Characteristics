@@ -25,7 +25,7 @@ def _assert_paths(path_to_source, path_to_dest):
     assert os.path.exists(os.path.dirname(path_to_dest)), \
         'Please create directory at {} first!'.format(os.path.dirname(path_to_dest))
 
-def batchify_data(path_to_source, path_to_dest, batch_size):
+def batchify_data(path_to_source, path_to_dest, nb_batches, encoding='latin1'):
     '''Break a dataframe up into smaller batches to support parallel execution
         
     Keyword arguments:
@@ -33,16 +33,17 @@ def batchify_data(path_to_source, path_to_dest, batch_size):
                         ( default: None  )
     path_to_dump -- path to where the batched dataframes (csv) need to be dumped
                     ( default: None  )
-    batch_size -- size of the batches ( default: nrows of dataframe  )
+    batch_size -- number of batches to create ( default: 1 )
     '''
     source_df = pd.read_csv(path_to_source, encoding='latin1')
     nrows, _ = source_df.shape
-
-    print('\nPreparing to batchify the dataframe. Please wait ..')
+    batch_size = int(nrows / nb_batches)
+    
+    print('\nPreparing to split the dataframe into {} batches of {} rows. Please wait ..'.format(nb_batches, batch_size))
     for _idx, start in enumerate(range(0, nrows, batch_size)):
         stop = start + batch_size
         batch_df = source_df.iloc[start:, :] if stop > nrows else source_df.iloc[start:stop, :]
-        batch_df.to_csv(path_to_dump.format(idx=_idx), encoding='latin1', index=False)
+        batch_df.to_csv(path_to_dest.format(idx=_idx), encoding=encoding, index=False)
     print('Batchification of dataframe completed!\n')
 
 def stitch_batch_data(path_to_source, path_to_dest, encoding='latin1'):
@@ -85,7 +86,7 @@ def add_census_data(path_to_source, path_to_dest, src_loc_fields, census_name, d
     msa_mapping_client = MSAMapper(src_loc_df.fillna(''))
 
     dest_loc_fields = [ census_name.upper() + '_NAME', census_name.upper() + '_CODE' ]
-    dest_loc_df = msa_mapping_client.map_data(census_name, dest_loc_fields, data_format)
+    dest_loc_df = msa_mapping_client.map_data('metsa' if census_name == 'msa' else 'tract', dest_loc_fields, data_format)
     dest_df = pd.concat([ source_df, dest_loc_df[ dest_loc_fields  ]  ], axis=1)
 
     print('Adding MSA data to dataframe completed! Dumping data to {}'.format(path_to_dest))
@@ -99,11 +100,22 @@ if __name__ == '__main__':
     parser.add_argument('--query', default='', help='subset of endpoint data to work on')
     parser.add_argument('--census_name', default='msa', help='name of census level to work on')
     parser.add_argument('--batch', type=int, help='batch idx to operate on')
+    parser.add_argument('--nb_batches', type=int, default=1, help='number to batches to create')
 
     args = parser.parse_args()
 
     if args.op == 'batchify':
-        pass # TODO
+        assert args.endpoint is not None, 'Please choose endpoint to operate on first!'
+
+        source_key = raw_input('Please enter source keyword: ')
+        dest_key = raw_input('Please enter destination keyword: ')
+
+        path_to_source = path_to[source_key].format(endpoint=args.endpoint, query=args.query)
+        path_to_dest = path_to[dest_key].format(endpoint=args.endpoint, query=args.query, idx='{idx}')
+
+        _assert_paths(path_to_source, path_to_dest)
+
+        batchify_data(path_to_source, path_to_dest, args.nb_batches - 1, 'utf-8') 
 
     elif args.op == 'stitchify':
         assert args.endpoint is not None, 'Please choose endpoint to operate on first!'
@@ -127,7 +139,7 @@ if __name__ == '__main__':
             path_to_source = path_to['scraped_endpoint'].format(endpoint=args.endpoint, query=args.query)
             path_to_dest = path_to['with_census_endpoint'].format(endpoint=args.endpoint, query=args.query, census=args.census_name)
         else:
-            path_to_source = path_to['scraped_batch'].format(endpoint=args.endpoint, query=args.query, idx=args.batch)
+            path_to_source = path_to['interim_batch'].format(endpoint=args.endpoint, query=args.query, idx=args.batch)
             path_to_dest = path_to['with_census_batch'].format(endpoint=args.endpoint, query=args.query, idx=args.batch, census=args.census_name)
 
         _assert_paths(path_to_source, path_to_dest)
