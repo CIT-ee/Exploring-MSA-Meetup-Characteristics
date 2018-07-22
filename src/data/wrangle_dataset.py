@@ -86,7 +86,7 @@ def add_census_data(path_to_source, path_to_dest, src_loc_fields, census_name, d
     msa_mapping_client = MSAMapper(src_loc_df.fillna(''))
 
     dest_loc_fields = [ census_name.upper() + '_NAME', census_name.upper() + '_CODE' ]
-    dest_loc_df = msa_mapping_client.map_data('metsa' if census_name == 'msa' else 'tract', dest_loc_fields, data_format)
+    dest_loc_df = msa_mapping_client.map_data(census_name, dest_loc_fields, data_format)
     dest_df = pd.concat([ source_df, dest_loc_df[ dest_loc_fields  ]  ], axis=1)
 
     print('Adding MSA data to dataframe completed! Dumping data to {}'.format(path_to_dest))
@@ -139,7 +139,7 @@ if __name__ == '__main__':
             path_to_source = path_to['scraped_endpoint'].format(endpoint=args.endpoint, query=args.query)
             path_to_dest = path_to['with_census_endpoint'].format(endpoint=args.endpoint, query=args.query, census=args.census_name)
         else:
-            path_to_source = path_to['interim_batch'].format(endpoint=args.endpoint, query=args.query, idx=args.batch)
+            path_to_source = path_to['scraped_batch'].format(endpoint=args.endpoint, query=args.query, idx=args.batch)
             path_to_dest = path_to['with_census_batch'].format(endpoint=args.endpoint, query=args.query, idx=args.batch, census=args.census_name)
 
         _assert_paths(path_to_source, path_to_dest)
